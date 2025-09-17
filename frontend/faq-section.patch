@@ -1,0 +1,35 @@
+*** Begin Patch
+*** Update File: src/components/HomePage.js
+@@
+-      {/* FAQ */}
+-      <section className="faq">
+-        <div className="container">
+-          <h2>Frequently Asked Questions</h2>
+-          <div className="faq-container">
+-            {/* …your old, broken FAQ JSX here… */}
+-          </div>
+-        </div>
+-      </section>
++      {/* FAQ */}
++      <section className="faq">
++        <div className="container">
++          <h2>Frequently Asked Questions</h2>
++          <div className="faq-container">
++            {faqItems.map((item, i) => (
++              <div key={i} className="faq-item">
++                <button
++                  className={`faq-question ${faqOpen[i] ? "active" : ""}`}
++                  onClick={() => toggleFaq(i)}
++                >
++                  {item.q}
++                  <i className="fas fa-chevron-down faq-icon" />
++                </button>
++                <div className={`faq-answer ${faqOpen[i] ? "active" : ""}`}>
++                  {item.a}
++                </div>
++              </div>
++            ))}
++          </div>
++        </div>
++      </section>
+*** End Patch

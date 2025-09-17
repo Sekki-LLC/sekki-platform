@@ -1,0 +1,15 @@
+header.header .nav-list .nav-link,
+header.header .nav-list .nav-link:visited {
+  color: #161f3b !important;
+  text-decoration: none !important;
+}
+
+header.header .nav-list .nav-link:hover,
+header.header .nav-list .nav-link:focus {
+  color: #A0006D !important;
+}
+
+header.header .nav-list .nav-link.active {
+  color: #A0006D !important;
+  font-weight: 600 !important;
+}

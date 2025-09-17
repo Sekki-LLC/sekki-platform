@@ -1,0 +1,18 @@
+*** Begin Patch
+*** Update File: src/components/HomePage.js
+@@ const HomePage = () => {
+-  const [faqOpen, setFaqOpen] = useState({});
++  const [faqOpen, setFaqOpen] = useState({});
+
++  // FAQ items for rendering
++  const faqItems = [
++    { q: "What exactly is included in Founder Lifetime Access?", a: (<ul><li><span className="faq-highlight">All current analysis tools:</span> Market, Gap & SWOT Analysis</li><li><span className="faq-highlight">Unlimited analyses:</span> Create as many reports as you need, forever</li><li><span className="faq-highlight">All future tools:</span> Any new features are included</li><li><span className="faq-highlight">Platform enhancements:</span> ML improvements, UI/performance upgrades</li><li><span className="faq-highlight">5 simultaneous projects:</span> Multiple analyses at once</li><li><span className="faq-highlight">Single-user access:</span> Exclusive to your account</li></ul>) },
++    { q: "How does the 5-project limit work with unlimited analyses?", a: (<p>You can have up to 5 projects “in progress” at any given time—but unlimited analyses within each. Complete one project to start a new one.</p>) },
++    { q: "Can I upgrade from Essential or Growth to Founder Lifetime later?", a: (<p>Yes—upgrade anytime. Founder pricing of $2,999 is limited-time; afterward it increases to $4,999. Monthly payments credit toward lifetime purchase.</p>) },
++    { q: "How much can enterprises save vs traditional consulting?", a: (<ul><li><span className="faq-highlight">$900K–$1.3M+ annually</span> vs standard consulting</li><li><span className="faq-highlight">Market research:</span> $150K–$500K each vs unlimited</li><li><span className="faq-highlight">Strategy:</span> $300K–$1M vs included</li><li><span className="faq-highlight">Custom programming:</span> $200K+ vs included</li><li><span className="faq-highlight">Ongoing updates:</span> $100K+ vs continuous</li></ul>) },
++    { q: "What's the difference between Transform tiers?", a: (<p><span className="faq-highlight">Standard ($15K/mo):</span> 5 seats, 100 credits, basic custom programming.<br/><span className="faq-highlight">Premium ($25K/mo):</span> 10 seats, 250 credits, advanced programming.<br/><span className="faq-highlight">Enterprise ($50K/mo):</span> Unlimited seats/credits, custom integrations.</p>) },
++    { q: "Is there a money-back guarantee?", a: (<p>Yes—a 30-day full refund if not satisfied. Founder Lifetime includes a risk-free month of unlimited analyses.</p>) },
++    { q: "How quickly can I get started?", a: (<p>Immediately! Purchase grants instant access. Enterprise tiers include a 24-hour onboarding call.</p>) },
++    { q: "What if I need more than 5 simultaneous projects?", a: (<p>Enterprise tiers remove the 5-project limit. Individual plans cap active projects at 5, but unlimited total projects over time.</p>) }
++  ];
+*** End Patch

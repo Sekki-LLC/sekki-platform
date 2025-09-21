@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import { useAdminSettings } from '../context/AdminContext';
+import ResourcePageWrapper from '../../All/components/ResourcePageWrapper';
 import styles from './ParetoAnalysis.module.css';
 
 const ParetoAnalysis = () => {
+  const { adminSettings } = useAdminSettings();
+
   // Pareto Analysis data structure
   const [paretoData, setParetoData] = useState({
     projectName: '',
@@ -52,17 +56,6 @@ const ParetoAnalysis = () => {
     }
   });
 
-  // AI Chat state
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      type: 'ai',
-      content: "Welcome to Pareto Analysis! I'll help you apply the 80/20 rule to identify the vital few causes that create the most impact. Pareto analysis is perfect for prioritizing improvement efforts - typically 80% of problems come from 20% of causes. What problem would you like to analyze?",
-      timestamp: new Date()
-    }
-  ]);
-  const [currentMessage, setCurrentMessage] = useState('');
-  const [isAITyping, setIsAITyping] = useState(false);
   const [completionPercentage, setCompletionPercentage] = useState(0);
 
   // Calculate completion percentage
@@ -303,130 +296,44 @@ const ParetoAnalysis = () => {
     }));
   };
 
-  // Import data from CSV
-  const handleFileImport = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const text = e.target.result;
-        const lines = text.split('\n');
-        const categories = [];
-        
-        lines.forEach((line, index) => {
-          if (line.trim() && index > 0) { // Skip header
-            const [name, count, description] = line.split(',').map(item => item.trim());
-            if (name && !isNaN(count)) {
-              categories.push({
-                id: Date.now() + index,
-                name: name.replace(/"/g, ''),
-                count: parseInt(count) || 0,
-                percentage: 0,
-                cumulativePercentage: 0,
-                description: description ? description.replace(/"/g, '') : ''
-              });
-            }
-          }
-        });
-        
-        if (categories.length > 0) {
-          setParetoData(prev => ({
-            ...prev,
-            categories: categories,
-            lastUpdated: new Date().toISOString().split('T')[0]
-          }));
-        }
-      };
-      reader.readAsText(file);
-    }
-  };
-
-  // Mock AI response generation
-  const generateAIResponse = (userMessage) => {
-    const responses = {
-      '80/20': "The 80/20 rule (Pareto Principle) states that roughly 80% of effects come from 20% of causes. In quality: 80% of defects from 20% of defect types. In business: 80% of revenue from 20% of customers. Focus your improvement efforts on the vital few categories that create the most impact.",
-      'pareto chart': "A Pareto chart combines a bar chart (showing frequency/count) with a line chart (showing cumulative percentage). Categories are sorted by frequency, highest first. The line shows running total percentage. Look for the 'knee' in the curve - that's your vital few.",
-      'vital few': "The 'vital few' are the small number of categories causing most of your problems. These are your improvement priorities. Typically 2-5 categories will account for 70-80% of issues. Focus resources here for maximum impact rather than spreading efforts across all categories.",
-      'data collection': "Collect data systematically over a representative time period. Categories should be mutually exclusive (no overlap) and collectively exhaustive (cover all cases). Use consistent definitions. Aim for at least 50-100 data points for reliable analysis.",
-      'threshold': "The 80% threshold is traditional but not rigid. Some analyses show 70/30 or 90/10 patterns. The key is identifying the vital few. If your top 3 categories account for 60%+ of problems, they're worth prioritizing even if not exactly 80%.",
-      'categories': "Good categories are specific enough to be actionable but broad enough to be meaningful. 'Machine failure' is too broad - use 'Bearing failure', 'Belt failure', 'Motor failure'. Avoid too many small categories - group minor ones as 'Others'.",
-      'interpretation': "Look for: 1) Clear vital few (steep drop-off), 2) Flat distribution (no clear priorities), 3) Dominant single cause (investigate why). Strong Pareto effect = focus on top categories. Weak effect = look for hidden stratification or different root causes.",
-      'improvement': "After identifying vital few: 1) Investigate root causes of top categories, 2) Implement targeted solutions, 3) Monitor results, 4) Re-run Pareto analysis to verify improvement, 5) Focus on next vital few. Don't ignore the trivial many - just prioritize the vital few first.",
-      'default': "I can help with any aspect of Pareto analysis. Ask about the 80/20 rule, creating Pareto charts, identifying vital few categories, data collection methods, or interpreting results. What would you like to know?"
-    };
-
-    const lowerMessage = userMessage.toLowerCase();
-    for (const [key, response] of Object.entries(responses)) {
-      if (lowerMessage.includes(key)) {
-        return response;
-      }
-    }
-    return responses.default;
-  };
-
-  // Handle sending chat messages
-  const handleSendMessage = async () => {
-    if (!currentMessage.trim()) return;
-
-    const userMessage = {
-      id: Date.now(),
-      type: 'user',
-      content: currentMessage,
-      timestamp: new Date()
-    };
-
-    setChatMessages(prev => [...prev, userMessage]);
-    setCurrentMessage('');
-    setIsAITyping(true);
-
-    // Simulate AI response delay
-    setTimeout(() => {
-      const aiResponse = {
-        id: Date.now() + 1,
-        type: 'ai',
-        content: generateAIResponse(currentMessage),
-        timestamp: new Date()
-      };
-      setChatMessages(prev => [...prev, aiResponse]);
-      setIsAITyping(false);
-    }, 1500);
-  };
-
-  // Quick action handlers
-  const handleQuickAction = (message) => {
-    setCurrentMessage(message);
-  };
-
   return (
-    <div className={styles.paretoContainer}>
-      {/* Header */}
-      <div className={styles.header}>
-        <div className={styles.headerContent}>
-          <h1>Pareto Analysis</h1>
-          <div className={styles.progressSection}>
-            <div className={styles.progressBar}>
-              <div 
-                className={styles.progressFill} 
-                style={{ width: `${completionPercentage}%` }}
-              ></div>
+    <ResourcePageWrapper
+      pageName="Pareto Analysis"
+      toolName="Pareto"
+      adminSettings={adminSettings}
+    >
+      <div className={styles.paretoContainer}>
+        {/* Header */}
+        <div className={styles.header}>
+          <div className={styles.headerContent}>
+            <h1>Pareto Analysis</h1>
+            <div className={styles.progressSection}>
+              <div className={styles.progressBar}>
+                <div
+                  className={styles.progressFill}
+                  style={{
+                    width: `${completionPercentage}%`,
+                    background: '#0B1A33',
+                    backgroundImage: 'none'
+                  }}
+                />
+              </div>
+              <span className={styles.progressText}>{completionPercentage}% Complete</span>
             </div>
-            <span className={styles.progressText}>{completionPercentage}% Complete</span>
+          </div>
+          <div className={styles.headerActions}>
+            <button className={styles.saveBtn}>
+              <i className="fas fa-save"></i> Save Analysis
+            </button>
+            <button className={styles.exportBtn}>
+              <i className="fas fa-download"></i> Export Chart
+            </button>
           </div>
         </div>
-        <div className={styles.headerActions}>
-          <button className={styles.saveBtn}>
-            <i className="fas fa-save"></i> Save Analysis
-          </button>
-          <button className={styles.exportBtn}>
-            <i className="fas fa-download"></i> Export Chart
-          </button>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className={styles.mainContent}>
-        {/* Top Section: Pareto Information + AI Helper */}
-        <div className={styles.topSection}>
+        {/* Main Content */}
+        <div className={styles.mainContent}>
+          {/* Top Section removed; info card is now full-width */}
           <div className={styles.processInfoCard}>
             <h2>Pareto Analysis Information</h2>
             
@@ -496,473 +403,415 @@ const ParetoAnalysis = () => {
             </div>
           </div>
 
-          <div className={styles.chatSection}>
-            <div className={styles.chatCard}>
-              <div className={styles.chatHeader}>
-                <h3>
-                  <i className="fas fa-robot"></i>
-                  Pareto AI Guide
-                </h3>
-                <div className={styles.chatStatus}>
-                  {isAITyping ? (
-                    <span className={styles.typing}>
-                      <i className="fas fa-circle"></i>
-                      <i className="fas fa-circle"></i>
-                      <i className="fas fa-circle"></i>
-                    </span>
-                  ) : (
-                    <span className={styles.online}>Online</span>
-                  )}
-                </div>
+          {/* Analysis Details Section */}
+          <div className={styles.analysisDetailsCard}>
+            <div className={styles.sectionHeader}>
+              <h2>Analysis Details</h2>
+            </div>
+
+            <div className={styles.analysisDetailsGrid}>
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Problem Statement <span className={styles.required}>*</span>
+                </label>
+                <textarea
+                  className={styles.textareaInput}
+                  value={paretoData.analysisInfo.problemStatement}
+                  onChange={(e) => handleAnalysisInfoChange('problemStatement', e.target.value)}
+                  placeholder="Clearly describe the problem you're analyzing"
+                  rows={3}
+                />
               </div>
 
-              <div className={styles.chatMessages}>
-                {chatMessages.map((message) => (
-                  <div 
-                    key={message.id} 
-                    className={`${styles.message} ${styles[message.type]}`}
-                  >
-                    <div className={styles.messageContent}>
-                      {message.content}
-                    </div>
-                    <div className={styles.messageTime}>
-                      {message.timestamp.toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className={styles.chatInput}>
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Data Source <span className={styles.required}>*</span>
+                </label>
                 <input
                   type="text"
-                  value={currentMessage}
-                  onChange={(e) => setCurrentMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Ask me about Pareto analysis..."
-                  className={styles.messageInput}
+                  className={styles.textInput}
+                  value={paretoData.analysisInfo.dataSource}
+                  onChange={(e) => handleAnalysisInfoChange('dataSource', e.target.value)}
+                  placeholder="Where is the data coming from?"
                 />
-                <button 
-                  onClick={handleSendMessage}
-                  className={styles.sendBtn}
-                  disabled={!currentMessage.trim()}
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Timeframe <span className={styles.required}>*</span>
+                </label>
+                <input
+                  type="text"
+                  className={styles.textInput}
+                  value={paretoData.analysisInfo.timeframe}
+                  onChange={(e) => handleAnalysisInfoChange('timeframe', e.target.value)}
+                  placeholder="Time period for data collection (e.g., Last 3 months)"
+                />
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Category Type
+                </label>
+                <select
+                  className={styles.selectInput}
+                  value={paretoData.analysisInfo.category}
+                  onChange={(e) => handleAnalysisInfoChange('category', e.target.value)}
                 >
-                  <i className="fas fa-paper-plane"></i>
+                  <option value="defects">Defects</option>
+                  <option value="complaints">Customer Complaints</option>
+                  <option value="costs">Costs</option>
+                  <option value="time">Time/Duration</option>
+                  <option value="frequency">Frequency</option>
+                  <option value="custom">Custom</option>
+                </select>
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Unit of Measurement <span className={styles.required}>*</span>
+                </label>
+                <input
+                  type="text"
+                  className={styles.textInput}
+                  value={paretoData.analysisInfo.unit}
+                  onChange={(e) => handleAnalysisInfoChange('unit', e.target.value)}
+                  placeholder="Units (count, $, hours, etc.)"
+                />
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Analysis Purpose
+                </label>
+                <textarea
+                  className={styles.textareaInput}
+                  value={paretoData.analysisInfo.purpose}
+                  onChange={(e) => handleAnalysisInfoChange('purpose', e.target.value)}
+                  placeholder="Why is this analysis being conducted?"
+                  rows={3}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Data Categories Section */}
+          <div className={styles.categoriesCard}>
+            <div className={styles.sectionHeader}>
+              <h2>Data Categories</h2>
+              <div className={styles.dataActions}>
+                <button className={styles.addBtn} onClick={addCategory}>
+                  <i className="fas fa-plus"></i> Add Category
                 </button>
+                <button className={styles.generateBtn} onClick={generateSampleData}>
+                  <i className="fas fa-random"></i> Sample Data
+                </button>
+                <label className={styles.importBtn}>
+                  <i className="fas fa-upload"></i> Import CSV
+                  <input
+                    type="file"
+                    accept=".csv"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      const reader = new FileReader();
+                      reader.onload = (ev) => {
+                        const text = String(ev.target?.result || '');
+                        const lines = text.split('\n');
+                        const categories = [];
+                        lines.forEach((line, index) => {
+                          if (line.trim() && index > 0) {
+                            const [name, count, description] = line.split(',').map(item => item.trim());
+                            if (name && !isNaN(Number(count))) {
+                              categories.push({
+                                id: Date.now() + index,
+                                name: name.replace(/"/g, ''),
+                                count: parseInt(count) || 0,
+                                percentage: 0,
+                                cumulativePercentage: 0,
+                                description: description ? description.replace(/"/g, '') : ''
+                              });
+                            }
+                          }
+                        });
+                        if (categories.length > 0) {
+                          setParetoData(prev => ({
+                            ...prev,
+                            categories,
+                            lastUpdated: new Date().toISOString().split('T')[0]
+                          }));
+                        }
+                      };
+                      reader.readAsText(file);
+                    }}
+                    style={{ display: 'none' }}
+                  />
+                </label>
               </div>
-
-              <div className={styles.quickActions}>
-                <h4>Quick Help</h4>
-                <div className={styles.actionButtons}>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('What is the 80/20 rule?')}
-                  >
-                    80/20 Rule
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('How do I identify the vital few?')}
-                  >
-                    Vital Few
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('How should I collect data for Pareto analysis?')}
-                  >
-                    Data Collection
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('How do I interpret Pareto results?')}
-                  >
-                    Interpretation
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Analysis Details Section */}
-        <div className={styles.analysisDetailsCard}>
-          <div className={styles.sectionHeader}>
-            <h2>Analysis Details</h2>
-          </div>
-
-          <div className={styles.analysisDetailsGrid}>
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Problem Statement <span className={styles.required}>*</span>
-              </label>
-              <textarea
-                className={styles.textareaInput}
-                value={paretoData.analysisInfo.problemStatement}
-                onChange={(e) => handleAnalysisInfoChange('problemStatement', e.target.value)}
-                placeholder="Clearly describe the problem you're analyzing"
-                rows={3}
-              />
             </div>
 
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Data Source <span className={styles.required}>*</span>
-              </label>
-              <input
-                type="text"
-                className={styles.textInput}
-                value={paretoData.analysisInfo.dataSource}
-                onChange={(e) => handleAnalysisInfoChange('dataSource', e.target.value)}
-                placeholder="Where is the data coming from?"
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Timeframe <span className={styles.required}>*</span>
-              </label>
-              <input
-                type="text"
-                className={styles.textInput}
-                value={paretoData.analysisInfo.timeframe}
-                onChange={(e) => handleAnalysisInfoChange('timeframe', e.target.value)}
-                placeholder="Time period for data collection (e.g., Last 3 months)"
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Category Type
-              </label>
-              <select
-                className={styles.selectInput}
-                value={paretoData.analysisInfo.category}
-                onChange={(e) => handleAnalysisInfoChange('category', e.target.value)}
-              >
-                <option value="defects">Defects</option>
-                <option value="complaints">Customer Complaints</option>
-                <option value="costs">Costs</option>
-                <option value="time">Time/Duration</option>
-                <option value="frequency">Frequency</option>
-                <option value="custom">Custom</option>
-              </select>
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Unit of Measurement <span className={styles.required}>*</span>
-              </label>
-              <input
-                type="text"
-                className={styles.textInput}
-                value={paretoData.analysisInfo.unit}
-                onChange={(e) => handleAnalysisInfoChange('unit', e.target.value)}
-                placeholder="Units (count, $, hours, etc.)"
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Analysis Purpose
-              </label>
-              <textarea
-                className={styles.textareaInput}
-                value={paretoData.analysisInfo.purpose}
-                onChange={(e) => handleAnalysisInfoChange('purpose', e.target.value)}
-                placeholder="Why is this analysis being conducted?"
-                rows={3}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Data Categories Section */}
-        <div className={styles.categoriesCard}>
-          <div className={styles.sectionHeader}>
-            <h2>Data Categories</h2>
-            <div className={styles.dataActions}>
-              <button className={styles.addBtn} onClick={addCategory}>
-                <i className="fas fa-plus"></i> Add Category
-              </button>
-              <button className={styles.generateBtn} onClick={generateSampleData}>
-                <i className="fas fa-random"></i> Sample Data
-              </button>
-              <label className={styles.importBtn}>
-                <i className="fas fa-upload"></i> Import CSV
-                <input
-                  type="file"
-                  accept=".csv"
-                  onChange={handleFileImport}
-                  style={{ display: 'none' }}
-                />
-              </label>
-            </div>
-          </div>
-
-          <div className={styles.categoriesGrid}>
-            {paretoData.categories.map((category, index) => (
-              <div key={category.id} className={styles.categoryCard}>
-                <div className={styles.categoryHeader}>
-                  <h3>Category {index + 1}</h3>
-                  {paretoData.categories.length > 1 && (
-                    <button 
-                      className={styles.removeBtn}
-                      onClick={() => removeCategory(category.id)}
-                    >
-                      <i className="fas fa-times"></i>
-                    </button>
-                  )}
-                </div>
-
-                <div className={styles.categoryFields}>
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Category Name</label>
-                    <input
-                      type="text"
-                      className={styles.textInput}
-                      value={category.name}
-                      onChange={(e) => handleCategoryChange(category.id, 'name', e.target.value)}
-                      placeholder="Category name"
-                    />
+            <div className={styles.categoriesGrid}>
+              {paretoData.categories.map((category, index) => (
+                <div key={category.id} className={styles.categoryCard}>
+                  <div className={styles.categoryHeader}>
+                    <h3>Category {index + 1}</h3>
+                    {paretoData.categories.length > 1 && (
+                      <button 
+                        className={styles.removeBtn}
+                        onClick={() => removeCategory(category.id)}
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    )}
                   </div>
 
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Count/Value</label>
-                    <input
-                      type="number"
-                      min="0"
-                      className={styles.textInput}
-                      value={category.count}
-                      onChange={(e) => handleCategoryChange(category.id, 'count', parseInt(e.target.value) || 0)}
-                      placeholder="0"
-                    />
-                  </div>
-
-                  {category.percentage > 0 && (
-                    <div className={styles.calculatedValues}>
-                      <div className={styles.calculatedItem}>
-                        <span className={styles.calculatedLabel}>Percentage:</span>
-                        <span className={styles.calculatedValue}>{category.percentage}%</span>
-                      </div>
-                      <div className={styles.calculatedItem}>
-                        <span className={styles.calculatedLabel}>Cumulative:</span>
-                        <span className={styles.calculatedValue}>{category.cumulativePercentage}%</span>
-                      </div>
+                  <div className={styles.categoryFields}>
+                    <div className={styles.fieldGroup}>
+                      <label className={styles.fieldLabel}>Category Name</label>
+                      <input
+                        type="text"
+                        className={styles.textInput}
+                        value={category.name}
+                        onChange={(e) => handleCategoryChange(category.id, 'name', e.target.value)}
+                        placeholder="Category name"
+                      />
                     </div>
-                  )}
 
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Description</label>
-                    <textarea
-                      className={styles.textareaInput}
-                      value={category.description}
-                      onChange={(e) => handleCategoryChange(category.id, 'description', e.target.value)}
-                      placeholder="Additional details about this category"
-                      rows={2}
-                    />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+                    <div className={styles.fieldGroup}>
+                      <label className={styles.fieldLabel}>Count/Value</label>
+                      <input
+                        type="number"
+                        min="0"
+                        className={styles.textInput}
+                        value={category.count}
+                        onChange={(e) => handleCategoryChange(category.id, 'count', parseInt(e.target.value) || 0)}
+                        placeholder="0"
+                      />
+                    </div>
 
-        {/* Analysis Settings Section */}
-        <div className={styles.settingsCard}>
-          <div className={styles.sectionHeader}>
-            <h2>Analysis Settings</h2>
-          </div>
-
-          <div className={styles.settingsGrid}>
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Pareto Threshold (%)
-              </label>
-              <input
-                type="number"
-                min="50"
-                max="95"
-                className={styles.textInput}
-                value={paretoData.settings.threshold}
-                onChange={(e) => handleSettingsChange('threshold', parseInt(e.target.value) || 80)}
-                placeholder="80"
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Show Top N Categories
-              </label>
-              <input
-                type="number"
-                min="3"
-                max="20"
-                className={styles.textInput}
-                value={paretoData.settings.showTop}
-                onChange={(e) => handleSettingsChange('showTop', parseInt(e.target.value) || 10)}
-                placeholder="10"
-              />
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Sort By
-              </label>
-              <select
-                className={styles.selectInput}
-                value={paretoData.settings.sortBy}
-                onChange={(e) => handleSettingsChange('sortBy', e.target.value)}
-              >
-                <option value="count">Count/Value</option>
-                <option value="percentage">Percentage</option>
-              </select>
-            </div>
-
-            <div className={styles.fieldGroup}>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={paretoData.settings.includeOthers}
-                  onChange={(e) => handleSettingsChange('includeOthers', e.target.checked)}
-                />
-                Group remaining as "Others"
-              </label>
-            </div>
-          </div>
-        </div>
-
-        {/* Results Section */}
-        <div className={styles.resultsCard}>
-          <div className={styles.sectionHeader}>
-            <h2>Pareto Analysis Results</h2>
-          </div>
-
-          {paretoData.results.totalCount > 0 ? (
-            <div className={styles.resultsContent}>
-              {/* Summary Metrics */}
-              <div className={styles.summaryMetrics}>
-                <div className={styles.metricCard}>
-                  <h4>Total Count</h4>
-                  <div className={styles.metricValue}>
-                    {paretoData.results.totalCount}
-                  </div>
-                  <div className={styles.metricDescription}>Total occurrences</div>
-                </div>
-                <div className={styles.metricCard}>
-                  <h4>Categories</h4>
-                  <div className={styles.metricValue}>
-                    {paretoData.categories.filter(cat => cat.count > 0).length}
-                  </div>
-                  <div className={styles.metricDescription}>Active categories</div>
-                </div>
-                <div className={styles.metricCard}>
-                  <h4>Vital Few</h4>
-                  <div className={styles.metricValue}>
-                    {paretoData.results.vitalFew.length}
-                  </div>
-                  <div className={styles.metricDescription}>Top priority categories</div>
-                </div>
-                <div className={styles.metricCard}>
-                  <h4>Pareto Point</h4>
-                  <div className={styles.metricValue}>
-                    {paretoData.results.paretoPoint}
-                  </div>
-                  <div className={styles.metricDescription}>Categories for {paretoData.settings.threshold}%</div>
-                </div>
-              </div>
-
-              {/* Vital Few Categories */}
-              {paretoData.results.vitalFew.length > 0 && (
-                <div className={styles.vitalFewSection}>
-                  <h3>Vital Few Categories (Priority Focus)</h3>
-                  <div className={styles.vitalFewGrid}>
-                    {paretoData.results.vitalFew.map((category, index) => (
-                      <div key={category.id} className={styles.vitalFewCard}>
-                        <div className={styles.vitalFewRank}>#{index + 1}</div>
-                        <div className={styles.vitalFewName}>{category.name}</div>
-                        <div className={styles.vitalFewStats}>
-                          <div className={styles.vitalFewCount}>{category.count}</div>
-                          <div className={styles.vitalFewPercentage}>{category.percentage}%</div>
-                          <div className={styles.vitalFewCumulative}>Cum: {category.cumulativePercentage}%</div>
+                    {category.percentage > 0 && (
+                      <div className={styles.calculatedValues}>
+                        <div className={styles.calculatedItem}>
+                          <span className={styles.calculatedLabel}>Percentage:</span>
+                          <span className={styles.calculatedValue}>{category.percentage}%</span>
+                        </div>
+                        <div className={styles.calculatedItem}>
+                          <span className={styles.calculatedLabel}>Cumulative:</span>
+                          <span className={styles.calculatedValue}>{category.cumulativePercentage}%</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    )}
 
-              {/* Top Categories Table */}
-              <div className={styles.topCategoriesSection}>
-                <h3>Top Categories Breakdown</h3>
-                <div className={styles.categoriesTable}>
-                  <div className={styles.tableHeader}>
-                    <div>Rank</div>
-                    <div>Category</div>
-                    <div>Count</div>
-                    <div>Percentage</div>
-                    <div>Cumulative %</div>
-                  </div>
-                  {paretoData.results.topCategories.map((category) => (
-                    <div key={category.id} className={styles.tableRow}>
-                      <div>{category.rank}</div>
-                      <div>{category.name}</div>
-                      <div>{category.count}</div>
-                      <div>{category.percentage}%</div>
-                      <div>{category.cumulativePercentage}%</div>
+                    <div className={styles.fieldGroup}>
+                      <label className={styles.fieldLabel}>Description</label>
+                      <textarea
+                        className={styles.textareaInput}
+                        value={category.description}
+                        onChange={(e) => handleCategoryChange(category.id, 'description', e.target.value)}
+                        placeholder="Additional details about this category"
+                        rows={2}
+                      />
                     </div>
-                  ))}
+                  </div>
                 </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Analysis Settings Section */}
+          <div className={styles.settingsCard}>
+            <div className={styles.sectionHeader}>
+              <h2>Analysis Settings</h2>
+            </div>
+
+            <div className={styles.settingsGrid}>
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Pareto Threshold (%)
+                </label>
+                <input
+                  type="number"
+                  min="50"
+                  max="95"
+                  className={styles.textInput}
+                  value={paretoData.settings.threshold}
+                  onChange={(e) => handleSettingsChange('threshold', parseInt(e.target.value) || 80)}
+                  placeholder="80"
+                />
               </div>
 
-              {/* Insights */}
-              {paretoData.results.insights.length > 0 && (
-                <div className={styles.insightsSection}>
-                  <h3>Key Insights</h3>
-                  <div className={styles.insightsList}>
-                    {paretoData.results.insights.map((insight, index) => (
-                      <div key={index} className={styles.insightItem}>
-                        <i className="fas fa-lightbulb"></i>
-                        <span>{insight}</span>
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Show Top N Categories
+                </label>
+                <input
+                  type="number"
+                  min="3"
+                  max="20"
+                  className={styles.textInput}
+                  value={paretoData.settings.showTop}
+                  onChange={(e) => handleSettingsChange('showTop', parseInt(e.target.value) || 10)}
+                  placeholder="10"
+                />
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Sort By
+                </label>
+                <select
+                  className={styles.selectInput}
+                  value={paretoData.settings.sortBy}
+                  onChange={(e) => handleSettingsChange('sortBy', e.target.value)}
+                >
+                  <option value="count">Count/Value</option>
+                  <option value="percentage">Percentage</option>
+                </select>
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.checkboxLabel}>
+                  <input
+                    type="checkbox"
+                    checked={paretoData.settings.includeOthers}
+                    onChange={(e) => handleSettingsChange('includeOthers', e.target.checked)}
+                  />
+                  Group remaining as "Others"
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Results Section */}
+          <div className={styles.resultsCard}>
+            <div className={styles.sectionHeader}>
+              <h2>Pareto Analysis Results</h2>
+            </div>
+
+            {paretoData.results.totalCount > 0 ? (
+              <div className={styles.resultsContent}>
+                {/* Summary Metrics */}
+                <div className={styles.summaryMetrics}>
+                  <div className={styles.metricCard}>
+                    <h4>Total Count</h4>
+                    <div className={styles.metricValue}>
+                      {paretoData.results.totalCount}
+                    </div>
+                    <div className={styles.metricDescription}>Total occurrences</div>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <h4>Categories</h4>
+                    <div className={styles.metricValue}>
+                      {paretoData.categories.filter(cat => cat.count > 0).length}
+                    </div>
+                    <div className={styles.metricDescription}>Active categories</div>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <h4>Vital Few</h4>
+                    <div className={styles.metricValue}>
+                      {paretoData.results.vitalFew.length}
+                    </div>
+                    <div className={styles.metricDescription}>Top priority categories</div>
+                  </div>
+                  <div className={styles.metricCard}>
+                    <h4>Pareto Point</h4>
+                    <div className={styles.metricValue}>
+                      {paretoData.results.paretoPoint}
+                    </div>
+                    <div className={styles.metricDescription}>Categories for {paretoData.settings.threshold}%</div>
+                  </div>
+                </div>
+
+                {/* Vital Few Categories */}
+                {paretoData.results.vitalFew.length > 0 && (
+                  <div className={styles.vitalFewSection}>
+                    <h3>Vital Few Categories (Priority Focus)</h3>
+                    <div className={styles.vitalFewGrid}>
+                      {paretoData.results.vitalFew.map((category, index) => (
+                        <div key={category.id} className={styles.vitalFewCard}>
+                          <div className={styles.vitalFewRank}>#{index + 1}</div>
+                          <div className={styles.vitalFewName}>{category.name}</div>
+                          <div className={styles.vitalFewStats}>
+                            <div className={styles.vitalFewCount}>{category.count}</div>
+                            <div className={styles.vitalFewPercentage}>{category.percentage}%</div>
+                            <div className={styles.vitalFewCumulative}>Cum: {category.cumulativePercentage}%</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Top Categories Table */}
+                <div className={styles.topCategoriesSection}>
+                  <h3>Top Categories Breakdown</h3>
+                  <div className={styles.categoriesTable}>
+                    <div className={styles.tableHeader}>
+                      <div>Rank</div>
+                      <div>Category</div>
+                      <div>Count</div>
+                      <div>Percentage</div>
+                      <div>Cumulative %</div>
+                    </div>
+                    {paretoData.results.topCategories.map((category) => (
+                      <div key={category.id} className={styles.tableRow}>
+                        <div>{category.rank}</div>
+                        <div>{category.name}</div>
+                        <div>{category.count}</div>
+                        <div>{category.percentage}%</div>
+                        <div>{category.cumulativePercentage}%</div>
                       </div>
                     ))}
                   </div>
                 </div>
-              )}
-            </div>
-          ) : (
-            <div className={styles.emptyResults}>
-              <i className="fas fa-chart-bar"></i>
-              <p>Add category data to see Pareto analysis results.</p>
-            </div>
-          )}
-        </div>
-      </div>
 
-      {/* Footer */}
-      <div className={styles.footer}>
-        <div className={styles.footerContent}>
-          <div className={styles.completionStatus}>
-            <i className="fas fa-check-circle"></i>
-            <span>Pareto Analysis {completionPercentage}% Complete</span>
+                {/* Insights */}
+                {paretoData.results.insights.length > 0 && (
+                  <div className={styles.insightsSection}>
+                    <h3>Key Insights</h3>
+                    <div className={styles.insightsList}>
+                      {paretoData.results.insights.map((insight, index) => (
+                        <div key={index} className={styles.insightItem}>
+                          <i className="fas fa-lightbulb"></i>
+                          <span>{insight}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className={styles.emptyResults}>
+                <i className="fas fa-chart-bar"></i>
+                <p>Add category data to see Pareto analysis results.</p>
+              </div>
+            )}
           </div>
-          <div className={styles.footerActions}>
-            <button className={styles.secondaryBtn}>
-              <i className="fas fa-eye"></i> Preview Chart
-            </button>
-            <button 
-              className={styles.primaryBtn}
-              disabled={completionPercentage < 70}
-            >
-              <i className="fas fa-check"></i> Complete Analysis
-            </button>
+        </div>
+
+        {/* Footer */}
+        <div className={styles.footer}>
+          <div className={styles.footerContent}>
+            <div className={styles.completionStatus}>
+              <i className="fas fa-check-circle"></i>
+              <span>Pareto Analysis {completionPercentage}% Complete</span>
+            </div>
+            <div className={styles.footerActions}>
+              <button className={styles.secondaryBtn}>
+                <i className="fas fa-eye"></i> Preview Chart
+              </button>
+              <button 
+                className={styles.primaryBtn}
+                disabled={completionPercentage < 70}
+              >
+                <i className="fas fa-check"></i> Complete Analysis
+              </button>
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </ResourcePageWrapper>
   );
 };
 
 export default ParetoAnalysis;
-

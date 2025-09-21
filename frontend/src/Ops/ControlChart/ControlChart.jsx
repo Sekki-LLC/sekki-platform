@@ -1,7 +1,12 @@
+// ControlChart.jsx
 import React, { useState, useEffect } from 'react';
 import styles from './ControlChart.module.css';
+import { useAdminSettings } from '../context/AdminContext';
+import ResourcePageWrapper from '../../All/components/ResourcePageWrapper';
 
 const ControlChart = () => {
+  const { adminSettings } = useAdminSettings();
+
   // Control Chart data structure
   const [controlChartData, setControlChartData] = useState({
     // Project Information
@@ -112,74 +117,6 @@ const ControlChart = () => {
 
   const [completionPercentage, setCompletionPercentage] = useState(0);
 
-  // AI Chat state - matching other tools structure
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      type: 'ai',
-      content: "Welcome to Control Chart Analysis! I'll help you create and analyze control charts for statistical process control. Control charts are essential for monitoring process stability, detecting special causes, and maintaining quality. What process characteristic are you monitoring?",
-      timestamp: new Date()
-    }
-  ]);
-  const [currentMessage, setCurrentMessage] = useState('');
-  const [isAITyping, setIsAITyping] = useState(false);
-
-  // Chat responses
-  const generateAIResponse = (userMessage) => {
-    const responses = {
-      'control chart': "Control charts monitor process stability over time. Choose the right chart type: X̄-R for variable data with constant sample size, I-MR for individual measurements, p-chart for proportion defective, c-chart for count of defects.",
-      'spc rules': "The 8 SPC rules detect special causes: Rule 1 (beyond control limits), Rule 2 (9 points same side), Rule 3 (6 trending), Rule 4 (14 alternating), Rule 5 (2 of 3 beyond 2σ), Rule 6 (4 of 5 beyond 1σ), Rule 7 (15 within 1σ), Rule 8 (8 beyond 1σ).",
-      'control limits': "Control limits represent the voice of the process (±3σ from centerline). They're calculated from process data, not specifications. UCL = X̄ + A₂R̄, LCL = X̄ - A₂R̄ for X̄-R charts.",
-      'special cause': "Special causes create non-random patterns indicating process changes. Look for points beyond control limits, trends, shifts, cycles, or rule violations. Investigate and eliminate special causes.",
-      'common cause': "Common cause variation is inherent to the process - random, predictable within limits. Reduce through process improvement, not adjustment. Control charts help distinguish from special causes.",
-      'capability': "Process capability compares process spread to specification width. Cp measures potential capability, Cpk accounts for centering. Aim for Cpk ≥ 1.33 for good capability.",
-      'subgroup': "Rational subgroups should be homogeneous within but allow maximum opportunity for variation between subgroups. Sample consecutively produced items or similar conditions.",
-      'chart selection': "Variable data: X̄-R (n=2-10), X̄-S (n>10), I-MR (n=1). Attribute data: p-chart (proportion), np-chart (count defective), c-chart (defects per unit), u-chart (defects per variable area).",
-      'default': "I can help you with control chart selection, SPC rules, control limit calculations, pattern analysis, process capability, or special cause investigation. What specific aspect interests you?"
-    };
-
-    const lowerMessage = userMessage.toLowerCase();
-    for (const [key, response] of Object.entries(responses)) {
-      if (lowerMessage.includes(key)) {
-        return response;
-      }
-    }
-    return responses.default;
-  };
-
-  // Handle sending chat messages - matching other tools structure
-  const handleSendMessage = async () => {
-    if (!currentMessage.trim()) return;
-
-    const userMessage = {
-      id: Date.now(),
-      type: 'user',
-      content: currentMessage,
-      timestamp: new Date()
-    };
-
-    setChatMessages(prev => [...prev, userMessage]);
-    setCurrentMessage('');
-    setIsAITyping(true);
-
-    // Simulate AI response delay
-    setTimeout(() => {
-      const aiResponse = {
-        id: Date.now() + 1,
-        type: 'ai',
-        content: generateAIResponse(currentMessage),
-        timestamp: new Date()
-      };
-      setChatMessages(prev => [...prev, aiResponse]);
-      setIsAITyping(false);
-    }, 1500);
-  };
-
-  // Quick action handler
-  const handleQuickAction = (message) => {
-    setCurrentMessage(message);
-  };
-
   // Calculate completion percentage
   useEffect(() => {
     const calculateCompletion = () => {
@@ -224,7 +161,7 @@ const ControlChart = () => {
     calculateCompletion();
   }, [controlChartData]);
 
-  // Handle basic info changes
+  // Handlers
   const handleBasicInfoChange = (field, value) => {
     setControlChartData(prev => ({
       ...prev,
@@ -233,7 +170,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Handle config changes
   const handleConfigChange = (field, value) => {
     setControlChartData(prev => ({
       ...prev,
@@ -245,7 +181,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Handle specification changes
   const handleSpecificationChange = (field, value) => {
     setControlChartData(prev => ({
       ...prev,
@@ -260,7 +195,21 @@ const ControlChart = () => {
     }));
   };
 
-  // Add subgroup
+  const handleControlLimitsChange = (chartType, field, value) => {
+    setControlChartData(prev => ({
+      ...prev,
+      controlLimits: {
+        ...prev.controlLimits,
+        [chartType]: {
+          ...prev.controlLimits[chartType],
+          [field]: value
+        }
+      },
+      lastUpdated: new Date().toISOString().split('T')[0]
+    }));
+  };
+
+  // Subgroups
   const addSubgroup = () => {
     const newSubgroup = {
       id: Date.now(),
@@ -284,7 +233,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Remove subgroup
   const removeSubgroup = (subgroupId) => {
     setControlChartData(prev => ({
       ...prev,
@@ -296,7 +244,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Handle subgroup changes
   const handleSubgroupChange = (subgroupId, field, value) => {
     setControlChartData(prev => ({
       ...prev,
@@ -310,7 +257,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Handle measurement changes
   const handleMeasurementChange = (subgroupId, measurementIndex, value) => {
     setControlChartData(prev => ({
       ...prev,
@@ -329,7 +275,7 @@ const ControlChart = () => {
     }));
   };
 
-  // Calculate control limits
+  // Calculate control limits (Xbar-R demo for n=5)
   const calculateControlLimits = () => {
     const subgroups = controlChartData.dataCollection.subgroups;
     if (subgroups.length === 0) return;
@@ -400,22 +346,7 @@ const ControlChart = () => {
     }));
   };
 
-  // Handle control limits changes
-  const handleControlLimitsChange = (chartType, field, value) => {
-    setControlChartData(prev => ({
-      ...prev,
-      controlLimits: {
-        ...prev.controlLimits,
-        [chartType]: {
-          ...prev.controlLimits[chartType],
-          [field]: value
-        }
-      },
-      lastUpdated: new Date().toISOString().split('T')[0]
-    }));
-  };
-
-  // Handle SPC analysis changes
+  // SPC + Actions
   const handleSPCAnalysisChange = (section, field, value) => {
     setControlChartData(prev => ({
       ...prev,
@@ -430,7 +361,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Handle rule changes
   const handleRuleChange = (ruleNumber, field, value) => {
     setControlChartData(prev => ({
       ...prev,
@@ -448,7 +378,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Handle actions changes
   const handleActionsChange = (field, value) => {
     setControlChartData(prev => ({
       ...prev,
@@ -460,7 +389,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Add investigation
   const addInvestigation = () => {
     const newInvestigation = {
       id: Date.now(),
@@ -483,7 +411,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Remove investigation
   const removeInvestigation = (investigationId) => {
     setControlChartData(prev => ({
       ...prev,
@@ -495,7 +422,6 @@ const ControlChart = () => {
     }));
   };
 
-  // Handle investigation changes
   const handleInvestigationChange = (investigationId, field, value) => {
     setControlChartData(prev => ({
       ...prev,
@@ -509,21 +435,21 @@ const ControlChart = () => {
     }));
   };
 
-  // Save draft
+  // Save/Export
   const handleSave = () => {
     console.log('Saving Control Chart draft:', controlChartData);
-    // Implement save functionality
   };
 
-  // Export PDF
   const handleExport = () => {
     console.log('Exporting Control Chart to PDF:', controlChartData);
-    // Implement export functionality
   };
 
   return (
-    <div className={styles.rcaContainer}>
-      {/* Header - Exact match to other tools */}
+    <div
+      className={styles.rcaContainer}
+      style={{ paddingBottom: 0, marginBottom: 0 }}
+    >
+      {/* Header */}
       <div className={styles.header}>
         <div className={styles.headerContent}>
           <h1>Control Chart Analysis</h1>
@@ -548,209 +474,119 @@ const ControlChart = () => {
       </div>
 
       {/* Main Content */}
-      <div className={styles.mainContent}>
-        {/* Top Section: Chart Information + AI Helper - Exact match to other tools */}
-        <div className={styles.topSection}>
-          <div className={styles.processInfoCard}>
-            <h2>Control Chart Information</h2>
-            
+      <div
+        className={styles.mainContent}
+        style={{
+          paddingBottom: 0,
+          marginBottom: 0,
+          display: 'flow-root' // prevent margin-collapsing at the bottom
+        }}
+      >
+        {/* Control Chart Information */}
+        <div className={styles.processInfoCard}>
+          <h2>Control Chart Information</h2>
+          
+          <div className={styles.fieldGroup}>
+            <label className={styles.fieldLabel}>
+              Chart Title <span className={styles.required}>*</span>
+            </label>
+            <input
+              type="text"
+              className={styles.textInput}
+              value={controlChartData.chartTitle}
+              onChange={(e) => handleBasicInfoChange('chartTitle', e.target.value)}
+              placeholder="Enter the title for your control chart"
+            />
+          </div>
+
+          <div className={styles.fieldRow}>
             <div className={styles.fieldGroup}>
               <label className={styles.fieldLabel}>
-                Chart Title <span className={styles.required}>*</span>
+                Analyst <span className={styles.required}>*</span>
               </label>
               <input
                 type="text"
                 className={styles.textInput}
-                value={controlChartData.chartTitle}
-                onChange={(e) => handleBasicInfoChange('chartTitle', e.target.value)}
-                placeholder="Enter the title for your control chart"
+                value={controlChartData.analyst}
+                onChange={(e) => handleBasicInfoChange('analyst', e.target.value)}
+                placeholder="Who is conducting the analysis?"
               />
             </div>
-
-            <div className={styles.fieldRow}>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>
-                  Analyst <span className={styles.required}>*</span>
-                </label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={controlChartData.analyst}
-                  onChange={(e) => handleBasicInfoChange('analyst', e.target.value)}
-                  placeholder="Who is conducting the analysis?"
-                />
-              </div>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>
-                  Date Created
-                </label>
-                <input
-                  type="date"
-                  className={styles.textInput}
-                  value={controlChartData.dateCreated}
-                  onChange={(e) => handleBasicInfoChange('dateCreated', e.target.value)}
-                />
-              </div>
-            </div>
-
             <div className={styles.fieldGroup}>
               <label className={styles.fieldLabel}>
-                Purpose <span className={styles.required}>*</span>
+                Date Created
               </label>
-              <textarea
-                className={styles.textareaInput}
-                value={controlChartData.chartConfig.purpose}
-                onChange={(e) => handleConfigChange('purpose', e.target.value)}
-                placeholder="What is the purpose of this control chart?"
-                rows={2}
+              <input
+                type="date"
+                className={styles.textInput}
+                value={controlChartData.dateCreated}
+                onChange={(e) => handleBasicInfoChange('dateCreated', e.target.value)}
               />
-            </div>
-
-            <div className={styles.fieldRow}>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Process</label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={controlChartData.chartConfig.process}
-                  onChange={(e) => handleConfigChange('process', e.target.value)}
-                  placeholder="Process being monitored"
-                />
-              </div>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Characteristic</label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={controlChartData.chartConfig.characteristic}
-                  onChange={(e) => handleConfigChange('characteristic', e.target.value)}
-                  placeholder="Quality characteristic measured"
-                />
-              </div>
-            </div>
-
-            <div className={styles.fieldRow}>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Chart Type</label>
-                <select
-                  className={styles.selectInput}
-                  value={controlChartData.chartConfig.chartType}
-                  onChange={(e) => handleConfigChange('chartType', e.target.value)}
-                >
-                  <option value="xbar-r">X̄-R Chart</option>
-                  <option value="xbar-s">X̄-S Chart</option>
-                  <option value="individuals">I-MR Chart</option>
-                  <option value="p-chart">p-Chart</option>
-                  <option value="np-chart">np-Chart</option>
-                  <option value="c-chart">c-Chart</option>
-                  <option value="u-chart">u-Chart</option>
-                </select>
-              </div>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Unit</label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={controlChartData.chartConfig.unit}
-                  onChange={(e) => handleConfigChange('unit', e.target.value)}
-                  placeholder="mm, kg, %, count"
-                />
-              </div>
             </div>
           </div>
 
-          <div className={styles.chatSection}>
-            <div className={styles.chatCard}>
-              <div className={styles.chatHeader}>
-                <h3>
-                  <i className="fas fa-robot"></i>
-                  SPC AI Guide
-                </h3>
-                <div className={styles.chatStatus}>
-                  {isAITyping ? (
-                    <span className={styles.typing}>
-                      <i className="fas fa-circle"></i>
-                      <i className="fas fa-circle"></i>
-                      <i className="fas fa-circle"></i>
-                    </span>
-                  ) : (
-                    <span className={styles.online}>Online</span>
-                  )}
-                </div>
-              </div>
+          <div className={styles.fieldGroup}>
+            <label className={styles.fieldLabel}>
+              Purpose <span className={styles.required}>*</span>
+            </label>
+            <textarea
+              className={styles.textareaInput}
+              value={controlChartData.chartConfig.purpose}
+              onChange={(e) => handleConfigChange('purpose', e.target.value)}
+              placeholder="What is the purpose of this control chart?"
+              rows={2}
+            />
+          </div>
 
-              <div className={styles.chatMessages}>
-                {chatMessages.map((message) => (
-                  <div 
-                    key={message.id} 
-                    className={`${styles.message} ${styles[message.type]}`}
-                  >
-                    <div className={styles.messageContent}>
-                      {message.content}
-                    </div>
-                    <div className={styles.messageTime}>
-                      {message.timestamp.toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
+          <div className={styles.fieldRow}>
+            <div className={styles.fieldGroup}>
+              <label className={styles.fieldLabel}>Process</label>
+              <input
+                type="text"
+                className={styles.textInput}
+                value={controlChartData.chartConfig.process}
+                onChange={(e) => handleConfigChange('process', e.target.value)}
+                placeholder="Process being monitored"
+              />
+            </div>
+            <div className={styles.fieldGroup}>
+              <label className={styles.fieldLabel}>Characteristic</label>
+              <input
+                type="text"
+                className={styles.textInput}
+                value={controlChartData.chartConfig.characteristic}
+                onChange={(e) => handleConfigChange('characteristic', e.target.value)}
+                placeholder="Quality characteristic measured"
+              />
+            </div>
+          </div>
 
-              <div className={styles.chatInput}>
-                <input
-                  type="text"
-                  value={currentMessage}
-                  onChange={(e) => setCurrentMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Ask me about control charts..."
-                  className={styles.messageInput}
-                />
-                <button 
-                  onClick={handleSendMessage}
-                  className={styles.sendBtn}
-                  disabled={!currentMessage.trim()}
-                >
-                  <i className="fas fa-paper-plane"></i>
-                </button>
-              </div>
-
-              <div className={styles.quickActions}>
-                <h4>Quick Help</h4>
-                <div className={styles.actionButtons}>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('What is a control chart?')}
-                  >
-                    Control Chart Basics
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('What are SPC rules?')}
-                  >
-                    SPC Rules
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('How do I calculate control limits?')}
-                  >
-                    Control Limits
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('What is special cause?')}
-                  >
-                    Special Causes
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('How do I select chart type?')}
-                  >
-                    Chart Selection
-                  </button>
-                </div>
-              </div>
+          <div className={styles.fieldRow}>
+            <div className={styles.fieldGroup}>
+              <label className={styles.fieldLabel}>Chart Type</label>
+              <select
+                className={styles.selectInput}
+                value={controlChartData.chartConfig.chartType}
+                onChange={(e) => handleConfigChange('chartType', e.target.value)}
+              >
+                <option value="xbar-r">X̄-R Chart</option>
+                <option value="xbar-s">X̄-S Chart</option>
+                <option value="individuals">I-MR Chart</option>
+                <option value="p-chart">p-Chart</option>
+                <option value="np-chart">np-Chart</option>
+                <option value="c-chart">c-Chart</option>
+                <option value="u-chart">u-Chart</option>
+              </select>
+            </div>
+            <div className={styles.fieldGroup}>
+              <label className={styles.fieldLabel}>Unit</label>
+              <input
+                type="text"
+                className={styles.textInput}
+                value={controlChartData.chartConfig.unit}
+                onChange={(e) => handleConfigChange('unit', e.target.value)}
+                placeholder="mm, kg, %, count"
+              />
             </div>
           </div>
         </div>
@@ -1287,8 +1123,8 @@ const ControlChart = () => {
           </div>
         </div>
 
-        {/* Documentation & Summary Section */}
-        <div className={styles.analysisCard}>
+        {/* Documentation & Summary Section (LAST CONTENT BLOCK) */}
+        <div className={styles.analysisCard} style={{ marginBottom: 0 }}>
           <h2>Documentation & Summary</h2>
           <div className={styles.documentationGrid}>
             <div className={styles.fieldGroup}>
@@ -1326,6 +1162,15 @@ const ControlChart = () => {
             </div>
           </div>
         </div>
+
+        {/* Keep this wrapper INSIDE mainContent and flush */}
+        <div style={{ margin: 0, padding: 0 }}>
+          <ResourcePageWrapper 
+            pageName="Control Chart"
+            toolName="Control Chart"
+            adminSettings={adminSettings}
+          />
+        </div>
       </div>
     </div>
   );
@@ -1347,4 +1192,3 @@ const getRuleDescription = (ruleNumber) => {
 };
 
 export default ControlChart;
-

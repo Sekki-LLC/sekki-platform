@@ -141,7 +141,7 @@ const LSSDashboard = () => {
 
   const navigate = useNavigate();
 
-  const { projects, loading, error, createProject } = useLSSProject();
+  const { projects } = useLSSProject();
   const { DMAIC_PHASES } = useLSSWorkflow();
 
   const dmaicPhaseNames = Array.isArray(DMAIC_PHASES)
@@ -430,7 +430,7 @@ const LSSDashboard = () => {
       savings: 0,
       createdAt: new Date().toISOString()
     };
-    if (typeof createProject === 'function') createProject(newProject);
+    // if (typeof createProject === 'function') createProject(newProject);
   };
 
   // Admin tabs (removed System Settings tab — slide-over replaces it)
@@ -443,18 +443,20 @@ const LSSDashboard = () => {
       ]
     : [{ id: 'overview', label: 'Overview', icon: 'fas fa-chart-line' }];
 
-  // Keep original tool sections for Admin/Project Lead only
+  // ======== LEFT NAV SECTIONS (Updated categorization only) ========
   const allSections = {
     dmaic: {
       title: 'DMAIC TOOLS',
       icon: 'fas fa-project-diagram',
       tools: [
+        { name: 'DMAIC', icon: 'fas fa-stream' },
         { name: 'Project Charter', icon: 'fas fa-clipboard-list' },
+        { name: 'Problem Statement', icon: 'fas fa-quote-left' },
         { name: 'SIPOC', icon: 'fas fa-sitemap' },
         { name: 'Voice of Customer', icon: 'fas fa-comments' },
         { name: 'Process Map', icon: 'fas fa-project-diagram' },
-        { name: 'Root Cause Analysis', icon: 'fas fa-search' },
-        { name: 'FMEA', icon: 'fas fa-exclamation-triangle' }
+        { name: 'Stakeholder Analysis', icon: 'fas fa-users' },
+        { name: 'Data Collection', icon: 'fas fa-database' },
       ]
     },
     kaizen: {
@@ -477,50 +479,51 @@ const LSSDashboard = () => {
         { name: 'Histogram', icon: 'fas fa-chart-area' },
         { name: 'Capability Analysis', icon: 'fas fa-calculator' },
         { name: 'DOE (Design of Experiments)', icon: 'fas fa-flask' },
+        { name: 'MSA (Measurement System Analysis)', icon: 'fas fa-ruler' },
+        { name: 'Run Chart', icon: 'fas fa-wave-square' },
+        { name: 'Scatter Plot', icon: 'fas fa-braille' },
+        { name: 'Box Plot', icon: 'fas fa-square' },
+        { name: 'ANOVA', icon: 'fas fa-table' },
+        { name: 'Hypothesis Testing', icon: 'fas fa-vial' },
+        { name: 'Checksheet', icon: 'fas fa-clipboard-check' },
       ]
     },
     analysis: {
       title: 'ANALYSIS TOOLS',
       icon: 'fas fa-search-plus',
       tools: [
-        { name: 'MSA (Measurement System Analysis)', icon: 'fas fa-ruler' },
+        { name: 'Root Cause Analysis', icon: 'fas fa-search' },
         { name: '5 Whys', icon: 'fas fa-question-circle' },
+        { name: 'FMEA', icon: 'fas fa-exclamation-triangle' },
+        { name: 'Gap Analysis', icon: 'fas fa-ruler-combined' },
         { name: 'Value Stream Map', icon: 'fas fa-stream' },
-        { name: 'Scatter Plot', icon: 'fas fa-braille' },
-        { name: 'Run Chart', icon: 'fas fa-wave-square' },
-        { name: 'Hypothesis Testing', icon: 'fas fa-vial' },
-        { name: 'Box Plot', icon: 'fas fa-square' },
-        { name: 'ANOVA', icon: 'fas fa-table' },
       ]
     },
     changeManagement: {
       title: 'CHANGE MANAGEMENT TOOLS',
       icon: 'fas fa-exchange-alt',
       tools: [
-        { name: 'Control Plan', icon: 'fas fa-shield-alt' },
+        { name: 'Project Planning', icon: 'fas fa-project-diagram' },
         { name: 'Solution Selection', icon: 'fas fa-tasks' },
         { name: 'Pilot Plan', icon: 'fas fa-rocket' },
         { name: 'Implementation Plan', icon: 'fas fa-route' },
+        { name: 'Effort-Impact Matrix', icon: 'fas fa-th-large' },
+        { name: 'Control Plan', icon: 'fas fa-shield-alt' },
+        { name: 'Sustainment Plan', icon: 'fas fa-leaf' },
+        { name: 'Standard Work', icon: 'fas fa-clipboard-check' },
+        { name: 'Checklists', icon: 'fas fa-list' },
         { name: 'A3', icon: 'fas fa-file-alt' },
-        { name: 'Checklists', icon: 'fas fa-list' }
       ]
     },
     financial: {
       title: 'FINANCIAL TOOLS',
       icon: 'fas fa-dollar-sign',
       tools: [
-        { name: 'Data Collection', icon: 'fas fa-database' },
-        { name: 'Effort-Impact Matrix', icon: 'fas fa-th-large' },
-        { name: 'Gap Analysis', icon: 'fas fa-ruler-combined' },
-        { name: 'Problem Statement', icon: 'fas fa-quote-left' },
-        { name: 'Project Planning', icon: 'fas fa-project-diagram' },
-        { name: 'Stakeholder Analysis', icon: 'fas fa-users' },
-        { name: 'Sustainment Plan', icon: 'fas fa-leaf' },
-        { name: 'DMAIC', icon: 'fas fa-stream' },
         { name: 'FinY', icon: 'fas fa-dollar-sign' },
       ]
     }
   };
+  // ======== END Updated categorization ========
 
   const getToolSections = () => {
     const role = getUserRole();
@@ -896,7 +899,6 @@ const LSSDashboard = () => {
 
   // -------- System Settings Slide-over (ADMIN ONLY) --------
   const SystemSettingsSidebar = () => {
-    // Hooks at top level of component (safe)
     const [newUserName, setNewUserName] = useState('');
     const [newUserEmail, setNewUserEmail] = useState('');
     const [newUserRole, setNewUserRole] = useState('Team Member');
@@ -1261,6 +1263,8 @@ const LSSDashboard = () => {
                         const val = e.target.value;
                         if (val === 'dmaic') navigate('/ops/dmaic');
                         if (val === 'kaizen') navigate('/ops/kaizen');
+                        if (val === 'statistics') navigate('/ops/statistics');
+
                         e.target.value = '';
                       }}
                       defaultValue=""
@@ -1269,6 +1273,7 @@ const LSSDashboard = () => {
                       <option value="" disabled>Select…</option>
                       <option value="dmaic">DMAIC</option>
                       <option value="kaizen">Kaizen Blitz</option>
+                      <option value="statistics">Statistical Analysis</option>
                     </select>
                   </div>
                 );

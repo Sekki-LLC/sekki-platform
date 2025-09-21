@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
+import ResourcePageWrapper from '../../All/components/ResourcePageWrapper';
+import { useAdminSettings } from '../context/AdminContext';
 import styles from './Histogram.module.css';
 
 const Histogram = () => {
+  const { adminSettings } = useAdminSettings();
+
   // Histogram structure
   const [histogramData, setHistogramData] = useState({
     // Analysis Information
@@ -63,7 +67,7 @@ const Histogram = () => {
         kurtosis: 0
       },
       distribution: {
-        shape: '', // 'normal', 'skewed-left', 'skewed-right', 'bimodal', 'uniform', 'other'
+        shape: '',
         normalityTest: '',
         pValue: 0,
         isNormal: false,
@@ -75,8 +79,8 @@ const Histogram = () => {
     // Process Capability (if applicable)
     processCapability: {
       enabled: false,
-      lsl: '', // Lower Specification Limit
-      usl: '', // Upper Specification Limit
+      lsl: '',
+      usl: '',
       target: '',
       cp: 0,
       cpk: 0,
@@ -109,74 +113,6 @@ const Histogram = () => {
   });
 
   const [completionPercentage, setCompletionPercentage] = useState(0);
-
-  // AI Chat state - matching other tools structure
-  const [chatMessages, setChatMessages] = useState([
-    {
-      id: 1,
-      type: 'ai',
-      content: "Welcome to Histogram Analysis! I'll help you create and analyze histograms to understand data distribution patterns. Histograms reveal the shape, center, spread, and outliers in your data. They're essential for process capability analysis and understanding variation. What data are you analyzing?",
-      timestamp: new Date()
-    }
-  ]);
-  const [currentMessage, setCurrentMessage] = useState('');
-  const [isAITyping, setIsAITyping] = useState(false);
-
-  // Chat responses
-  const generateAIResponse = (userMessage) => {
-    const responses = {
-      'histogram': "Histograms show data distribution by grouping values into bins and displaying frequency. They reveal shape (normal, skewed, bimodal), center (mean, median), spread (standard deviation), and outliers. Essential for understanding process variation.",
-      'bins': "Bin selection affects histogram interpretation. Too few bins hide detail, too many create noise. Use Sturges' rule (log₂(n)+1), Scott's rule, or Freedman-Diaconis rule for automatic binning. Manual binning gives more control.",
-      'distribution': "Distribution shape tells you about your process: Normal (stable process), Right-skewed (lower limit), Left-skewed (upper limit), Bimodal (two processes), Uniform (random variation). Shape guides improvement actions.",
-      'normal curve': "Normal curve overlay helps assess normality. If data follows the curve, it's approximately normal. Deviations indicate skewness, outliers, or non-normal distributions. Use normality tests for statistical confirmation.",
-      'capability': "Process capability compares process variation to specification limits. Cp measures potential capability, Cpk measures actual capability considering centering. Values >1.33 indicate capable processes.",
-      'outliers': "Outliers are data points far from the main distribution. They may indicate special causes, measurement errors, or process shifts. Investigate outliers before removing them from analysis.",
-      'skewness': "Skewness measures distribution asymmetry. Positive skewness (right tail) suggests lower control limit effects. Negative skewness (left tail) suggests upper limit effects. Zero indicates symmetry.",
-      'interpretation': "Interpret histograms by examining shape, center, spread, and outliers. Consider process context, specification limits, and business impact. Use insights to guide process improvement decisions.",
-      'default': "I can help with data input, bin selection, distribution analysis, process capability, outlier investigation, normality testing, or histogram interpretation. What specific aspect needs guidance?"
-    };
-
-    const lowerMessage = userMessage.toLowerCase();
-    for (const [key, response] of Object.entries(responses)) {
-      if (lowerMessage.includes(key)) {
-        return response;
-      }
-    }
-    return responses.default;
-  };
-
-  // Handle sending chat messages - matching other tools structure
-  const handleSendMessage = async () => {
-    if (!currentMessage.trim()) return;
-
-    const userMessage = {
-      id: Date.now(),
-      type: 'user',
-      content: currentMessage,
-      timestamp: new Date()
-    };
-
-    setChatMessages(prev => [...prev, userMessage]);
-    setCurrentMessage('');
-    setIsAITyping(true);
-
-    // Simulate AI response delay
-    setTimeout(() => {
-      const aiResponse = {
-        id: Date.now() + 1,
-        type: 'ai',
-        content: generateAIResponse(currentMessage),
-        timestamp: new Date()
-      };
-      setChatMessages(prev => [...prev, aiResponse]);
-      setIsAITyping(false);
-    }, 1500);
-  };
-
-  // Quick action handler
-  const handleQuickAction = (message) => {
-    setCurrentMessage(message);
-  };
 
   // Calculate completion percentage
   useEffect(() => {
@@ -387,11 +323,9 @@ const Histogram = () => {
     const maximum = values[count - 1];
     const range = maximum - minimum;
     
-    // Calculate standard deviation
     const variance = values.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / count;
     const standardDeviation = Math.sqrt(variance);
     
-    // Calculate quartiles
     const q1Index = Math.floor(count * 0.25);
     const q3Index = Math.floor(count * 0.75);
     const q1 = values[q1Index];
@@ -406,7 +340,7 @@ const Histogram = () => {
           count,
           mean: Math.round(mean * 100) / 100,
           median: Math.round(median * 100) / 100,
-          mode: 0, // Simplified - would need more complex calculation
+          mode: 0,
           standardDeviation: Math.round(standardDeviation * 100) / 100,
           variance: Math.round(variance * 100) / 100,
           range: Math.round(range * 100) / 100,
@@ -415,8 +349,8 @@ const Histogram = () => {
           q1: Math.round(q1 * 100) / 100,
           q3: Math.round(q3 * 100) / 100,
           iqr: Math.round(iqr * 100) / 100,
-          skewness: 0, // Simplified
-          kurtosis: 0 // Simplified
+          skewness: 0,
+          kurtosis: 0
         }
       },
       lastUpdated: new Date().toISOString().split('T')[0]
@@ -470,947 +404,823 @@ const Histogram = () => {
     }));
   };
 
-  // Save draft
+  // Save / Export
   const handleSave = () => {
     console.log('Saving Histogram Analysis draft:', histogramData);
-    // Implement save functionality
   };
 
-  // Export PDF
   const handleExport = () => {
     console.log('Exporting Histogram Analysis to PDF:', histogramData);
-    // Implement export functionality
   };
 
   return (
-    <div className={styles.rcaContainer}>
-      {/* Header - Exact match to other tools */}
-      <div className={styles.header}>
-        <div className={styles.headerContent}>
-          <h1>Histogram Analysis</h1>
-          <div className={styles.progressSection}>
-            <div className={styles.progressBar}>
-              <div 
-                className={styles.progressFill} 
-                style={{ width: `${completionPercentage}%` }}
-              ></div>
+    <ResourcePageWrapper
+      pageName="Histogram Analysis"
+      toolName="histogram"
+      adminSettings={adminSettings}
+    >
+      <div className={styles.rcaContainer} style={{ paddingBottom: 0 }}>
+        {/* Header */}
+        <div className={styles.header}>
+          <div className={styles.headerContent}>
+            <h1>Histogram Analysis</h1>
+            <div className={styles.progressSection}>
+              <div className={styles.progressBar}>
+                <div
+                  className={styles.progressFill}
+                  style={{
+                    width: `${completionPercentage}%`,
+                    backgroundImage: 'none',
+                    backgroundColor: '#161f3b'
+                  }}
+                />
+              </div>
+              <span className={styles.progressText}>{completionPercentage}% Complete</span>
             </div>
-            <span className={styles.progressText}>{completionPercentage}% Complete</span>
+          </div>
+          <div className={styles.headerActions}>
+            <button className={styles.saveBtn} onClick={handleSave}>
+              <i className="fas fa-save"></i> Save Draft
+            </button>
+            <button className={styles.exportBtn} onClick={handleExport}>
+              <i className="fas fa-download"></i> Export PDF
+            </button>
           </div>
         </div>
-        <div className={styles.headerActions}>
-          <button className={styles.saveBtn} onClick={handleSave}>
-            <i className="fas fa-save"></i> Save Draft
-          </button>
-          <button className={styles.exportBtn} onClick={handleExport}>
-            <i className="fas fa-download"></i> Export PDF
-          </button>
-        </div>
-      </div>
 
-      {/* Main Content */}
-      <div className={styles.mainContent}>
-        {/* Top Section: Analysis Information + AI Helper - Exact match to other tools */}
-        <div className={styles.topSection}>
-          <div className={styles.processInfoCard}>
-            <h2>Analysis Information</h2>
-            
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Analysis Title <span className={styles.required}>*</span>
-              </label>
-              <input
-                type="text"
-                className={styles.textInput}
-                value={histogramData.analysisTitle}
-                onChange={(e) => handleBasicInfoChange('analysisTitle', e.target.value)}
-                placeholder="Enter the title for your histogram analysis"
-              />
-            </div>
-
-            <div className={styles.fieldRow}>
+        {/* Main Content */}
+        <div className={styles.mainContent} style={{ paddingBottom: 0 }}>
+          {/* Top Section: Analysis Information ONLY (full width) */}
+          <div className={styles.topSection}>
+            <div className={styles.processInfoCard} style={{ gridColumn: '1 / -1', width: '100%' }}>
+              <h2>Analysis Information</h2>
+              
               <div className={styles.fieldGroup}>
                 <label className={styles.fieldLabel}>
-                  Analyst <span className={styles.required}>*</span>
+                  Analysis Title <span className={styles.required}>*</span>
                 </label>
                 <input
                   type="text"
                   className={styles.textInput}
-                  value={histogramData.analyst}
-                  onChange={(e) => handleBasicInfoChange('analyst', e.target.value)}
-                  placeholder="Who is conducting this analysis?"
+                  value={histogramData.analysisTitle}
+                  onChange={(e) => handleBasicInfoChange('analysisTitle', e.target.value)}
+                  placeholder="Enter the title for your histogram analysis"
                 />
               </div>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>
-                  Date Created
-                </label>
-                <input
-                  type="date"
-                  className={styles.textInput}
-                  value={histogramData.dateCreated}
-                  onChange={(e) => handleBasicInfoChange('dateCreated', e.target.value)}
-                />
-              </div>
-            </div>
 
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Purpose <span className={styles.required}>*</span>
-              </label>
-              <textarea
-                className={styles.textareaInput}
-                value={histogramData.analysisSetup.purpose}
-                onChange={(e) => handleSetupChange('purpose', e.target.value)}
-                placeholder="What is the purpose of this histogram analysis?"
-                rows={2}
-              />
-            </div>
-
-            <div className={styles.fieldRow}>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Data Source</label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={histogramData.analysisSetup.dataSource}
-                  onChange={(e) => handleSetupChange('dataSource', e.target.value)}
-                  placeholder="Where does the data come from?"
-                />
-              </div>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Sample Size</label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={histogramData.analysisSetup.sampleSize}
-                  onChange={(e) => handleSetupChange('sampleSize', e.target.value)}
-                  placeholder="How many data points?"
-                />
-              </div>
-            </div>
-
-            <div className={styles.fieldRow}>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Variable</label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={histogramData.analysisSetup.variable}
-                  onChange={(e) => handleSetupChange('variable', e.target.value)}
-                  placeholder="What variable are you measuring?"
-                />
-              </div>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Unit</label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={histogramData.analysisSetup.unit}
-                  onChange={(e) => handleSetupChange('unit', e.target.value)}
-                  placeholder="Unit of measurement"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className={styles.chatSection}>
-            <div className={styles.chatCard}>
-              <div className={styles.chatHeader}>
-                <h3>
-                  <i className="fas fa-robot"></i>
-                  Histogram AI Guide
-                </h3>
-                <div className={styles.chatStatus}>
-                  {isAITyping ? (
-                    <span className={styles.typing}>
-                      <i className="fas fa-circle"></i>
-                      <i className="fas fa-circle"></i>
-                      <i className="fas fa-circle"></i>
-                    </span>
-                  ) : (
-                    <span className={styles.online}>Online</span>
-                  )}
-                </div>
-              </div>
-
-              <div className={styles.chatMessages}>
-                {chatMessages.map((message) => (
-                  <div 
-                    key={message.id} 
-                    className={`${styles.message} ${styles[message.type]}`}
-                  >
-                    <div className={styles.messageContent}>
-                      {message.content}
-                    </div>
-                    <div className={styles.messageTime}>
-                      {message.timestamp.toLocaleTimeString([], { 
-                        hour: '2-digit', 
-                        minute: '2-digit' 
-                      })}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className={styles.chatInput}>
-                <input
-                  type="text"
-                  value={currentMessage}
-                  onChange={(e) => setCurrentMessage(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Ask me about histograms..."
-                  className={styles.messageInput}
-                />
-                <button 
-                  onClick={handleSendMessage}
-                  className={styles.sendBtn}
-                  disabled={!currentMessage.trim()}
-                >
-                  <i className="fas fa-paper-plane"></i>
-                </button>
-              </div>
-
-              <div className={styles.quickActions}>
-                <h4>Quick Help</h4>
-                <div className={styles.actionButtons}>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('How do I choose the right number of bins?')}
-                  >
-                    Bin Selection
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('How do I interpret distribution shape?')}
-                  >
-                    Distribution Analysis
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('What do outliers mean?')}
-                  >
-                    Outlier Analysis
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('How do I assess process capability?')}
-                  >
-                    Process Capability
-                  </button>
-                  <button 
-                    className={styles.quickBtn}
-                    onClick={() => handleQuickAction('How do I interpret the histogram?')}
-                  >
-                    Interpretation Guide
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Data Input Section */}
-        <div className={styles.analysisCard}>
-          <h2>Data Input</h2>
-          <div className={styles.dataInputSection}>
-            <div className={styles.inputMethodSelector}>
-              <label className={styles.fieldLabel}>Input Method</label>
-              <div className={styles.methodButtons}>
-                <button 
-                  className={`${styles.methodBtn} ${histogramData.dataInput.method === 'manual' ? styles.active : ''}`}
-                  onClick={() => handleDataInputChange('method', 'manual')}
-                >
-                  Manual Entry
-                </button>
-                <button 
-                  className={`${styles.methodBtn} ${histogramData.dataInput.method === 'paste' ? styles.active : ''}`}
-                  onClick={() => handleDataInputChange('method', 'paste')}
-                >
-                  Paste Data
-                </button>
-              </div>
-            </div>
-            
-            {histogramData.dataInput.method === 'manual' && (
-              <div className={styles.manualInput}>
-                <div className={styles.sectionHeader}>
-                  <h3>Manual Data Entry</h3>
-                  <button className={styles.addBtn} onClick={addDataPoint}>
-                    <i className="fas fa-plus"></i> Add Data Point
-                  </button>
-                </div>
-                
-                <div className={styles.dataTable}>
-                  <table className={styles.dataEntryTable}>
-                    <thead>
-                      <tr>
-                        <th>Value</th>
-                        <th>Label</th>
-                        <th>Category</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {histogramData.dataInput.rawData.map((point) => (
-                        <tr key={point.id}>
-                          <td>
-                            <input
-                              type="number"
-                              step="any"
-                              className={styles.tableInput}
-                              value={point.value}
-                              onChange={(e) => handleDataPointChange(point.id, 'value', e.target.value)}
-                              placeholder="Value"
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="text"
-                              className={styles.tableInput}
-                              value={point.label}
-                              onChange={(e) => handleDataPointChange(point.id, 'label', e.target.value)}
-                              placeholder="Label"
-                            />
-                          </td>
-                          <td>
-                            <input
-                              type="text"
-                              className={styles.tableInput}
-                              value={point.category}
-                              onChange={(e) => handleDataPointChange(point.id, 'category', e.target.value)}
-                              placeholder="Category"
-                            />
-                          </td>
-                          <td>
-                            <button
-                              className={styles.removeBtn}
-                              onClick={() => removeDataPoint(point.id)}
-                            >
-                              <i className="fas fa-times"></i>
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-            
-            {histogramData.dataInput.method === 'paste' && (
-              <div className={styles.pasteInput}>
-                <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Paste Data (one value per line)</label>
-                  <textarea
-                    className={styles.textareaInput}
-                    value={histogramData.dataInput.pastedData}
-                    onChange={(e) => handleDataInputChange('pastedData', e.target.value)}
-                    placeholder="Paste your data here, one value per line..."
-                    rows={8}
-                  />
-                </div>
-                <button className={styles.processBtn} onClick={processPastedData}>
-                  <i className="fas fa-upload"></i> Process Data
-                </button>
-              </div>
-            )}
-            
-            <div className={styles.dataStats}>
-              <div className={styles.statCard}>
-                <span className={styles.statLabel}>Data Points</span>
-                <span className={styles.statValue}>{histogramData.dataInput.rawData.length}</span>
-              </div>
-              <button className={styles.calculateBtn} onClick={calculateStatistics}>
-                <i className="fas fa-calculator"></i> Calculate Statistics
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Histogram Configuration Section */}
-        <div className={styles.analysisCard}>
-          <h2>Histogram Configuration</h2>
-          <div className={styles.configurationGrid}>
-            <div className={styles.binConfiguration}>
-              <h3>Bin Configuration</h3>
               <div className={styles.fieldRow}>
                 <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Bin Method</label>
-                  <select
-                    className={styles.selectInput}
-                    value={histogramData.configuration.binMethod}
-                    onChange={(e) => handleConfigurationChange('binMethod', e.target.value)}
-                  >
-                    <option value="auto">Automatic</option>
-                    <option value="manual">Manual</option>
-                    <option value="sturges">Sturges' Rule</option>
-                    <option value="scott">Scott's Rule</option>
-                    <option value="freedman">Freedman-Diaconis</option>
-                  </select>
+                  <label className={styles.fieldLabel}>
+                    Analyst <span className={styles.required}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    className={styles.textInput}
+                    value={histogramData.analyst}
+                    onChange={(e) => handleBasicInfoChange('analyst', e.target.value)}
+                    placeholder="Who is conducting this analysis?"
+                  />
                 </div>
                 <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Number of Bins</label>
+                  <label className={styles.fieldLabel}>Date Created</label>
                   <input
-                    type="number"
-                    min="1"
-                    max="50"
+                    type="date"
                     className={styles.textInput}
-                    value={histogramData.configuration.numberOfBins}
-                    onChange={(e) => handleConfigurationChange('numberOfBins', parseInt(e.target.value))}
-                    disabled={histogramData.configuration.binMethod !== 'manual'}
+                    value={histogramData.dateCreated}
+                    onChange={(e) => handleBasicInfoChange('dateCreated', e.target.value)}
                   />
+                </div>
+              </div>
+
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>
+                  Purpose <span className={styles.required}>*</span>
+                </label>
+                <textarea
+                  className={styles.textareaInput}
+                  value={histogramData.analysisSetup.purpose}
+                  onChange={(e) => handleSetupChange('purpose', e.target.value)}
+                  placeholder="What is the purpose of this histogram analysis?"
+                  rows={2}
+                />
+              </div>
+
+              <div className={styles.fieldRow}>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Data Source</label>
+                  <input
+                    type="text"
+                    className={styles.textInput}
+                    value={histogramData.analysisSetup.dataSource}
+                    onChange={(e) => handleSetupChange('dataSource', e.target.value)}
+                    placeholder="Where does the data come from?"
+                  />
+                </div>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Sample Size</label>
+                  <input
+                    type="text"
+                    className={styles.textInput}
+                    value={histogramData.analysisSetup.sampleSize}
+                    onChange={(e) => handleSetupChange('sampleSize', e.target.value)}
+                    placeholder="How many data points?"
+                  />
+                </div>
+              </div>
+
+              <div className={styles.fieldRow}>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Variable</label>
+                  <input
+                    type="text"
+                    className={styles.textInput}
+                    value={histogramData.analysisSetup.variable}
+                    onChange={(e) => handleSetupChange('variable', e.target.value)}
+                    placeholder="What variable are you measuring?"
+                  />
+                </div>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Unit</label>
+                  <input
+                    type="text"
+                    className={styles.textInput}
+                    value={histogramData.analysisSetup.unit}
+                    onChange={(e) => handleSetupChange('unit', e.target.value)}
+                    placeholder="Unit of measurement"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Data Input Section */}
+          <div className={styles.analysisCard}>
+            <h2>Data Input</h2>
+            <div className={styles.dataInputSection}>
+              <div className={styles.inputMethodSelector}>
+                <label className={styles.fieldLabel}>Input Method</label>
+                <div className={styles.methodButtons}>
+                  <button 
+                    className={`${styles.methodBtn} ${histogramData.dataInput.method === 'manual' ? styles.active : ''}`}
+                    onClick={() => handleDataInputChange('method', 'manual')}
+                  >
+                    Manual Entry
+                  </button>
+                  <button 
+                    className={`${styles.methodBtn} ${histogramData.dataInput.method === 'paste' ? styles.active : ''}`}
+                    onClick={() => handleDataInputChange('method', 'paste')}
+                  >
+                    Paste Data
+                  </button>
                 </div>
               </div>
               
-              <div className={styles.fieldRow}>
-                <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Start Value</label>
-                  <input
-                    type="number"
-                    step="any"
-                    className={styles.textInput}
-                    value={histogramData.configuration.startValue}
-                    onChange={(e) => handleConfigurationChange('startValue', e.target.value)}
-                    placeholder="Auto-calculated"
-                  />
+              {histogramData.dataInput.method === 'manual' && (
+                <div className={styles.manualInput}>
+                  <div className={styles.sectionHeader}>
+                    <h3>Manual Data Entry</h3>
+                    <button className={styles.addBtn} onClick={addDataPoint}>
+                      <i className="fas fa-plus"></i> Add Data Point
+                    </button>
+                  </div>
+                  
+                  <div className={styles.dataTable}>
+                    <table className={styles.dataEntryTable}>
+                      <thead>
+                        <tr>
+                          <th>Value</th>
+                          <th>Label</th>
+                          <th>Category</th>
+                          <th>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {histogramData.dataInput.rawData.map((point) => (
+                          <tr key={point.id}>
+                            <td>
+                              <input
+                                type="number"
+                                step="any"
+                                className={styles.tableInput}
+                                value={point.value}
+                                onChange={(e) => handleDataPointChange(point.id, 'value', e.target.value)}
+                                placeholder="Value"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                className={styles.tableInput}
+                                value={point.label}
+                                onChange={(e) => handleDataPointChange(point.id, 'label', e.target.value)}
+                                placeholder="Label"
+                              />
+                            </td>
+                            <td>
+                              <input
+                                type="text"
+                                className={styles.tableInput}
+                                value={point.category}
+                                onChange={(e) => handleDataPointChange(point.id, 'category', e.target.value)}
+                                placeholder="Category"
+                              />
+                            </td>
+                            <td>
+                              <button
+                                className={styles.removeBtn}
+                                onClick={() => removeDataPoint(point.id)}
+                              >
+                                <i className="fas fa-times"></i>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
-                <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>End Value</label>
-                  <input
-                    type="number"
-                    step="any"
-                    className={styles.textInput}
-                    value={histogramData.configuration.endValue}
-                    onChange={(e) => handleConfigurationChange('endValue', e.target.value)}
-                    placeholder="Auto-calculated"
-                  />
+              )}
+              
+              {histogramData.dataInput.method === 'paste' && (
+                <div className={styles.pasteInput}>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Paste Data (one value per line)</label>
+                    <textarea
+                      className={styles.textareaInput}
+                      value={histogramData.dataInput.pastedData}
+                      onChange={(e) => handleDataInputChange('pastedData', e.target.value)}
+                      placeholder="Paste your data here, one value per line..."
+                      rows={8}
+                    />
+                  </div>
+                  <button className={styles.processBtn} onClick={processPastedData}>
+                    <i className="fas fa-upload"></i> Process Data
+                  </button>
                 </div>
-              </div>
-            </div>
-            
-            <div className={styles.displayOptions}>
-              <h3>Display Options</h3>
-              <div className={styles.checkboxGrid}>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={histogramData.configuration.showNormalCurve}
-                    onChange={(e) => handleConfigurationChange('showNormalCurve', e.target.checked)}
-                  />
-                  Show Normal Curve Overlay
-                </label>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={histogramData.configuration.showMean}
-                    onChange={(e) => handleConfigurationChange('showMean', e.target.checked)}
-                  />
-                  Show Mean Line
-                </label>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={histogramData.configuration.showMedian}
-                    onChange={(e) => handleConfigurationChange('showMedian', e.target.checked)}
-                  />
-                  Show Median Line
-                </label>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={histogramData.configuration.showMode}
-                    onChange={(e) => handleConfigurationChange('showMode', e.target.checked)}
-                  />
-                  Show Mode
-                </label>
-                <label className={styles.checkboxLabel}>
-                  <input
-                    type="checkbox"
-                    checked={histogramData.configuration.showOutliers}
-                    onChange={(e) => handleConfigurationChange('showOutliers', e.target.checked)}
-                  />
-                  Highlight Outliers
-                </label>
-              </div>
-            </div>
-            
-            <div className={styles.chartLabels}>
-              <h3>Chart Labels</h3>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Chart Title</label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={histogramData.configuration.title}
-                  onChange={(e) => handleConfigurationChange('title', e.target.value)}
-                  placeholder="Histogram title"
-                />
-              </div>
-              <div className={styles.fieldRow}>
-                <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>X-Axis Label</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={histogramData.configuration.xAxisLabel}
-                    onChange={(e) => handleConfigurationChange('xAxisLabel', e.target.value)}
-                    placeholder="X-axis label"
-                  />
+              )}
+              
+              <div className={styles.dataStats}>
+                <div className={styles.statCard}>
+                  <span className={styles.statLabel}>Data Points</span>
+                  <span className={styles.statValue}>{histogramData.dataInput.rawData.length}</span>
                 </div>
-                <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Y-Axis Label</label>
-                  <input
-                    type="text"
-                    className={styles.textInput}
-                    value={histogramData.configuration.yAxisLabel}
-                    onChange={(e) => handleConfigurationChange('yAxisLabel', e.target.value)}
-                    placeholder="Y-axis label"
-                  />
-                </div>
+                <button className={styles.calculateBtn} onClick={calculateStatistics}>
+                  <i className="fas fa-calculator"></i> Calculate Statistics
+                </button>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Statistical Analysis Section */}
-        <div className={styles.analysisCard}>
-          <h2>Statistical Analysis</h2>
-          <div className={styles.statisticsGrid}>
-            <div className={styles.descriptiveStats}>
-              <h3>Descriptive Statistics</h3>
-              <div className={styles.statsTable}>
-                <table className={styles.statisticsTable}>
-                  <tbody>
-                    <tr>
-                      <td className={styles.statLabel}>Count</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.count}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>Mean</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.mean}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>Median</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.median}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>Standard Deviation</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.standardDeviation}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>Variance</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.variance}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>Range</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.range}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>Minimum</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.minimum}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>Maximum</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.maximum}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>Q1 (25th percentile)</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.q1}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>Q3 (75th percentile)</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.q3}</td>
-                    </tr>
-                    <tr>
-                      <td className={styles.statLabel}>IQR</td>
-                      <td className={styles.statValue}>{histogramData.statistics.descriptive.iqr}</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-            
-            <div className={styles.distributionAnalysis}>
-              <h3>Distribution Analysis</h3>
-              <div className={styles.distributionCard}>
-                <div className={styles.fieldGroup}>
-                  <label className={styles.fieldLabel}>Distribution Shape</label>
-                  <select
-                    className={styles.selectInput}
-                    value={histogramData.statistics.distribution.shape}
-                    onChange={(e) => setHistogramData(prev => ({
-                      ...prev,
-                      statistics: {
-                        ...prev.statistics,
-                        distribution: {
-                          ...prev.statistics.distribution,
-                          shape: e.target.value
-                        }
-                      }
-                    }))}
-                  >
-                    <option value="">Select shape</option>
-                    <option value="normal">Normal</option>
-                    <option value="skewed-left">Skewed Left</option>
-                    <option value="skewed-right">Skewed Right</option>
-                    <option value="bimodal">Bimodal</option>
-                    <option value="uniform">Uniform</option>
-                    <option value="other">Other</option>
-                  </select>
+          {/* Histogram Configuration Section */}
+          <div className={styles.analysisCard}>
+            <h2>Histogram Configuration</h2>
+            <div className={styles.configurationGrid}>
+              <div className={styles.binConfiguration}>
+                <h3>Bin Configuration</h3>
+                <div className={styles.fieldRow}>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Bin Method</label>
+                    <select
+                      className={styles.selectInput}
+                      value={histogramData.configuration.binMethod}
+                      onChange={(e) => handleConfigurationChange('binMethod', e.target.value)}
+                    >
+                      <option value="auto">Automatic</option>
+                      <option value="manual">Manual</option>
+                      <option value="sturges">Sturges' Rule</option>
+                      <option value="scott">Scott's Rule</option>
+                      <option value="freedman">Freedman-Diaconis</option>
+                    </select>
+                  </div>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Number of Bins</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="50"
+                      className={styles.textInput}
+                      value={histogramData.configuration.numberOfBins}
+                      onChange={(e) => handleConfigurationChange('numberOfBins', parseInt(e.target.value))}
+                      disabled={histogramData.configuration.binMethod !== 'manual'}
+                    />
+                  </div>
                 </div>
                 
                 <div className={styles.fieldRow}>
                   <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>Normality Test</label>
-                    <select
-                      className={styles.selectInput}
-                      value={histogramData.statistics.distribution.normalityTest}
-                      onChange={(e) => setHistogramData(prev => ({
-                        ...prev,
-                        statistics: {
-                          ...prev.statistics,
-                          distribution: {
-                            ...prev.statistics.distribution,
-                            normalityTest: e.target.value
-                          }
-                        }
-                      }))}
-                    >
-                      <option value="">Select test</option>
-                      <option value="shapiro-wilk">Shapiro-Wilk</option>
-                      <option value="anderson-darling">Anderson-Darling</option>
-                      <option value="kolmogorov-smirnov">Kolmogorov-Smirnov</option>
-                      <option value="jarque-bera">Jarque-Bera</option>
-                    </select>
-                  </div>
-                  <div className={styles.fieldGroup}>
-                    <label className={styles.fieldLabel}>P-Value</label>
+                    <label className={styles.fieldLabel}>Start Value</label>
                     <input
                       type="number"
-                      step="0.001"
-                      min="0"
-                      max="1"
+                      step="any"
                       className={styles.textInput}
-                      value={histogramData.statistics.distribution.pValue}
-                      onChange={(e) => setHistogramData(prev => ({
-                        ...prev,
-                        statistics: {
-                          ...prev.statistics,
-                          distribution: {
-                            ...prev.statistics.distribution,
-                            pValue: parseFloat(e.target.value)
-                          }
-                        }
-                      }))}
-                      placeholder="P-value"
+                      value={histogramData.configuration.startValue}
+                      onChange={(e) => handleConfigurationChange('startValue', e.target.value)}
+                      placeholder="Auto-calculated"
+                    />
+                  </div>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>End Value</label>
+                    <input
+                      type="number"
+                      step="any"
+                      className={styles.textInput}
+                      value={histogramData.configuration.endValue}
+                      onChange={(e) => handleConfigurationChange('endValue', e.target.value)}
+                      placeholder="Auto-calculated"
                     />
                   </div>
                 </div>
-                
-                <div className={styles.normalityResult}>
+              </div>
+              
+              <div className={styles.displayOptions}>
+                <h3>Display Options</h3>
+                <div className={styles.checkboxGrid}>
                   <label className={styles.checkboxLabel}>
                     <input
                       type="checkbox"
-                      checked={histogramData.statistics.distribution.isNormal}
+                      checked={histogramData.configuration.showNormalCurve}
+                      onChange={(e) => handleConfigurationChange('showNormalCurve', e.target.checked)}
+                    />
+                    Show Normal Curve Overlay
+                  </label>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={histogramData.configuration.showMean}
+                      onChange={(e) => handleConfigurationChange('showMean', e.target.checked)}
+                    />
+                    Show Mean Line
+                  </label>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={histogramData.configuration.showMedian}
+                      onChange={(e) => handleConfigurationChange('showMedian', e.target.checked)}
+                    />
+                    Show Median Line
+                  </label>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={histogramData.configuration.showMode}
+                      onChange={(e) => handleConfigurationChange('showMode', e.target.checked)}
+                    />
+                    Show Mode
+                  </label>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={histogramData.configuration.showOutliers}
+                      onChange={(e) => handleConfigurationChange('showOutliers', e.target.checked)}
+                    />
+                    Highlight Outliers
+                  </label>
+                </div>
+              </div>
+              
+              <div className={styles.chartLabels}>
+                <h3>Chart Labels</h3>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Chart Title</label>
+                  <input
+                    type="text"
+                    className={styles.textInput}
+                    value={histogramData.configuration.title}
+                    onChange={(e) => handleConfigurationChange('title', e.target.value)}
+                    placeholder="Histogram title"
+                  />
+                </div>
+                <div className={styles.fieldRow}>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>X-Axis Label</label>
+                    <input
+                      type="text"
+                      className={styles.textInput}
+                      value={histogramData.configuration.xAxisLabel}
+                      onChange={(e) => handleConfigurationChange('xAxisLabel', e.target.value)}
+                      placeholder="X-axis label"
+                    />
+                  </div>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Y-Axis Label</label>
+                    <input
+                      type="text"
+                      className={styles.textInput}
+                      value={histogramData.configuration.yAxisLabel}
+                      onChange={(e) => handleConfigurationChange('yAxisLabel', e.target.value)}
+                      placeholder="Y-axis label"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Statistical Analysis Section */}
+          <div className={styles.analysisCard}>
+            <h2>Statistical Analysis</h2>
+            <div className={styles.statisticsGrid}>
+              <div className={styles.descriptiveStats}>
+                <h3>Descriptive Statistics</h3>
+                <div className={styles.statsTable}>
+                  <table className={styles.statisticsTable}>
+                    <tbody>
+                      <tr><td className={styles.statLabel}>Count</td><td className={styles.statValue}>{histogramData.statistics.descriptive.count}</td></tr>
+                      <tr><td className={styles.statLabel}>Mean</td><td className={styles.statValue}>{histogramData.statistics.descriptive.mean}</td></tr>
+                      <tr><td className={styles.statLabel}>Median</td><td className={styles.statValue}>{histogramData.statistics.descriptive.median}</td></tr>
+                      <tr><td className={styles.statLabel}>Standard Deviation</td><td className={styles.statValue}>{histogramData.statistics.descriptive.standardDeviation}</td></tr>
+                      <tr><td className={styles.statLabel}>Variance</td><td className={styles.statValue}>{histogramData.statistics.descriptive.variance}</td></tr>
+                      <tr><td className={styles.statLabel}>Range</td><td className={styles.statValue}>{histogramData.statistics.descriptive.range}</td></tr>
+                      <tr><td className={styles.statLabel}>Minimum</td><td className={styles.statValue}>{histogramData.statistics.descriptive.minimum}</td></tr>
+                      <tr><td className={styles.statLabel}>Maximum</td><td className={styles.statValue}>{histogramData.statistics.descriptive.maximum}</td></tr>
+                      <tr><td className={styles.statLabel}>Q1 (25th percentile)</td><td className={styles.statValue}>{histogramData.statistics.descriptive.q1}</td></tr>
+                      <tr><td className={styles.statLabel}>Q3 (75th percentile)</td><td className={styles.statValue}>{histogramData.statistics.descriptive.q3}</td></tr>
+                      <tr><td className={styles.statLabel}>IQR</td><td className={styles.statValue}>{histogramData.statistics.descriptive.iqr}</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              
+              <div className={styles.distributionAnalysis}>
+                <h3>Distribution Analysis</h3>
+                <div className={styles.distributionCard}>
+                  <div className={styles.fieldGroup}>
+                    <label className={styles.fieldLabel}>Distribution Shape</label>
+                    <select
+                      className={styles.selectInput}
+                      value={histogramData.statistics.distribution.shape}
                       onChange={(e) => setHistogramData(prev => ({
                         ...prev,
                         statistics: {
                           ...prev.statistics,
                           distribution: {
                             ...prev.statistics.distribution,
-                            isNormal: e.target.checked
+                            shape: e.target.value
                           }
                         }
                       }))}
-                    />
-                    Data is approximately normal (p &gt; 0.05)
-                  </label>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Process Capability Section */}
-        <div className={styles.analysisCard}>
-          <h2>Process Capability Analysis</h2>
-          <div className={styles.capabilitySection}>
-            <div className={styles.capabilityToggle}>
-              <label className={styles.checkboxLabel}>
-                <input
-                  type="checkbox"
-                  checked={histogramData.processCapability.enabled}
-                  onChange={(e) => handleCapabilityChange('enabled', e.target.checked)}
-                />
-                Enable Process Capability Analysis
-              </label>
-            </div>
-            
-            {histogramData.processCapability.enabled && (
-              <div className={styles.capabilityContent}>
-                <div className={styles.specificationLimits}>
-                  <h3>Specification Limits</h3>
+                    >
+                      <option value="">Select shape</option>
+                      <option value="normal">Normal</option>
+                      <option value="skewed-left">Skewed Left</option>
+                      <option value="skewed-right">Skewed Right</option>
+                      <option value="bimodal">Bimodal</option>
+                      <option value="uniform">Uniform</option>
+                      <option value="other">Other</option>
+                    </select>
+                  </div>
+                  
                   <div className={styles.fieldRow}>
                     <div className={styles.fieldGroup}>
-                      <label className={styles.fieldLabel}>Lower Specification Limit (LSL)</label>
-                      <input
-                        type="number"
-                        step="any"
-                        className={styles.textInput}
-                        value={histogramData.processCapability.lsl}
-                        onChange={(e) => handleCapabilityChange('lsl', e.target.value)}
-                        placeholder="LSL"
-                      />
+                      <label className={styles.fieldLabel}>Normality Test</label>
+                      <select
+                        className={styles.selectInput}
+                        value={histogramData.statistics.distribution.normalityTest}
+                        onChange={(e) => setHistogramData(prev => ({
+                          ...prev,
+                          statistics: {
+                            ...prev.statistics,
+                            distribution: {
+                              ...prev.statistics.distribution,
+                              normalityTest: e.target.value
+                            }
+                          }
+                        }))}
+                      >
+                        <option value="">Select test</option>
+                        <option value="shapiro-wilk">Shapiro-Wilk</option>
+                        <option value="anderson-darling">Anderson-Darling</option>
+                        <option value="kolmogorov-smirnov">Kolmogorov-Smirnov</option>
+                        <option value="jarque-bera">Jarque-Bera</option>
+                      </select>
                     </div>
                     <div className={styles.fieldGroup}>
-                      <label className={styles.fieldLabel}>Target Value</label>
+                      <label className={styles.fieldLabel}>P-Value</label>
                       <input
                         type="number"
-                        step="any"
+                        step="0.001"
+                        min="0"
+                        max="1"
                         className={styles.textInput}
-                        value={histogramData.processCapability.target}
-                        onChange={(e) => handleCapabilityChange('target', e.target.value)}
-                        placeholder="Target"
-                      />
-                    </div>
-                    <div className={styles.fieldGroup}>
-                      <label className={styles.fieldLabel}>Upper Specification Limit (USL)</label>
-                      <input
-                        type="number"
-                        step="any"
-                        className={styles.textInput}
-                        value={histogramData.processCapability.usl}
-                        onChange={(e) => handleCapabilityChange('usl', e.target.value)}
-                        placeholder="USL"
+                        value={histogramData.statistics.distribution.pValue}
+                        onChange={(e) => setHistogramData(prev => ({
+                          ...prev,
+                          statistics: {
+                            ...prev.statistics,
+                            distribution: {
+                              ...prev.statistics.distribution,
+                              pValue: parseFloat(e.target.value)
+                            }
+                          }
+                        }))}
+                        placeholder="P-value"
                       />
                     </div>
                   </div>
-                </div>
-                
-                <div className={styles.capabilityIndices}>
-                  <h3>Capability Indices</h3>
-                  <div className={styles.indicesGrid}>
-                    <div className={styles.indexCard}>
-                      <span className={styles.indexLabel}>Cp</span>
-                      <span className={styles.indexValue}>{histogramData.processCapability.cp}</span>
-                      <span className={styles.indexDescription}>Potential Capability</span>
-                    </div>
-                    <div className={styles.indexCard}>
-                      <span className={styles.indexLabel}>Cpk</span>
-                      <span className={styles.indexValue}>{histogramData.processCapability.cpk}</span>
-                      <span className={styles.indexDescription}>Actual Capability</span>
-                    </div>
-                    <div className={styles.indexCard}>
-                      <span className={styles.indexLabel}>Pp</span>
-                      <span className={styles.indexValue}>{histogramData.processCapability.pp}</span>
-                      <span className={styles.indexDescription}>Process Performance</span>
-                    </div>
-                    <div className={styles.indexCard}>
-                      <span className={styles.indexLabel}>Ppk</span>
-                      <span className={styles.indexValue}>{histogramData.processCapability.ppk}</span>
-                      <span className={styles.indexDescription}>Process Performance Index</span>
-                    </div>
-                    <div className={styles.indexCard}>
-                      <span className={styles.indexLabel}>Sigma Level</span>
-                      <span className={styles.indexValue}>{histogramData.processCapability.sigmaLevel}</span>
-                      <span className={styles.indexDescription}>Process Sigma</span>
-                    </div>
-                    <div className={styles.indexCard}>
-                      <span className={styles.indexLabel}>Yield</span>
-                      <span className={styles.indexValue}>{histogramData.processCapability.yield}%</span>
-                      <span className={styles.indexDescription}>Process Yield</span>
-                    </div>
+                  
+                  <div className={styles.normalityResult}>
+                    <label className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={histogramData.statistics.distribution.isNormal}
+                        onChange={(e) => setHistogramData(prev => ({
+                          ...prev,
+                          statistics: {
+                            ...prev.statistics,
+                            distribution: {
+                              ...prev.statistics.distribution,
+                              isNormal: e.target.checked
+                            }
+                          }
+                        }))}
+                      />
+                      Data is approximately normal (p &gt; 0.05)
+                    </label>
                   </div>
                 </div>
               </div>
-            )}
+            </div>
           </div>
-        </div>
 
-        {/* Insights & Interpretation Section */}
-        <div className={styles.analysisCard}>
-          <h2>Insights & Interpretation</h2>
-          <div className={styles.insightsSection}>
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Distribution Analysis <span className={styles.required}>*</span>
-              </label>
-              <textarea
-                className={styles.textareaInput}
-                value={histogramData.insights.distributionAnalysis}
-                onChange={(e) => handleInsightsChange('distributionAnalysis', e.target.value)}
-                placeholder="What does the distribution shape tell you about the process?"
-                rows={3}
-              />
-            </div>
-            
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>Process Insights</label>
-              <textarea
-                className={styles.textareaInput}
-                value={histogramData.insights.processInsights}
-                onChange={(e) => handleInsightsChange('processInsights', e.target.value)}
-                placeholder="What insights about the process can you derive from this histogram?"
-                rows={3}
-              />
-            </div>
-            
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>Recommendations</label>
-              <textarea
-                className={styles.textareaInput}
-                value={histogramData.insights.recommendations}
-                onChange={(e) => handleInsightsChange('recommendations', e.target.value)}
-                placeholder="What recommendations do you have based on this analysis?"
-                rows={3}
-              />
-            </div>
-            
-            <div className={styles.actionItemsSection}>
-              <div className={styles.sectionHeader}>
-                <h3>Action Items</h3>
-                <button className={styles.addBtn} onClick={addActionItem}>
-                  <i className="fas fa-plus"></i> Add Action
-                </button>
-              </div>
-              
-              <div className={styles.actionItemsList}>
-                {histogramData.insights.actionItems.map((action) => (
-                  <div key={action.id} className={styles.actionItem}>
-                    <input
-                      type="text"
-                      className={styles.actionInput}
-                      value={action.action}
-                      onChange={(e) => handleActionItemChange(action.id, 'action', e.target.value)}
-                      placeholder="Action item"
-                    />
-                    <input
-                      type="text"
-                      className={styles.actionInput}
-                      value={action.owner}
-                      onChange={(e) => handleActionItemChange(action.id, 'owner', e.target.value)}
-                      placeholder="Owner"
-                    />
-                    <input
-                      type="date"
-                      className={styles.actionInput}
-                      value={action.dueDate}
-                      onChange={(e) => handleActionItemChange(action.id, 'dueDate', e.target.value)}
-                    />
-                    <select
-                      className={styles.actionSelect}
-                      value={action.priority}
-                      onChange={(e) => handleActionItemChange(action.id, 'priority', e.target.value)}
-                    >
-                      <option value="low">Low</option>
-                      <option value="medium">Medium</option>
-                      <option value="high">High</option>
-                    </select>
-                    <button
-                      className={styles.removeBtn}
-                      onClick={() => removeActionItem(action.id)}
-                    >
-                      <i className="fas fa-times"></i>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-            <div className={styles.fieldRow}>
-              <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Follow-up Required</label>
+          {/* Process Capability Section */}
+          <div className={styles.analysisCard}>
+            <h2>Process Capability Analysis</h2>
+            <div className={styles.capabilitySection}>
+              <div className={styles.capabilityToggle}>
                 <label className={styles.checkboxLabel}>
                   <input
                     type="checkbox"
-                    checked={histogramData.insights.followUpRequired}
-                    onChange={(e) => handleInsightsChange('followUpRequired', e.target.checked)}
+                    checked={histogramData.processCapability.enabled}
+                    onChange={(e) => handleCapabilityChange('enabled', e.target.checked)}
                   />
-                  Additional analysis or data collection needed
+                  Enable Process Capability Analysis
                 </label>
               </div>
+              
+              {histogramData.processCapability.enabled && (
+                <div className={styles.capabilityContent}>
+                  <div className={styles.specificationLimits}>
+                    <h3>Specification Limits</h3>
+                    <div className={styles.fieldRow}>
+                      <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel}>Lower Specification Limit (LSL)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          className={styles.textInput}
+                          value={histogramData.processCapability.lsl}
+                          onChange={(e) => handleCapabilityChange('lsl', e.target.value)}
+                          placeholder="LSL"
+                        />
+                      </div>
+                      <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel}>Target Value</label>
+                        <input
+                          type="number"
+                          step="any"
+                          className={styles.textInput}
+                          value={histogramData.processCapability.target}
+                          onChange={(e) => handleCapabilityChange('target', e.target.value)}
+                          placeholder="Target"
+                        />
+                      </div>
+                      <div className={styles.fieldGroup}>
+                        <label className={styles.fieldLabel}>Upper Specification Limit (USL)</label>
+                        <input
+                          type="number"
+                          step="any"
+                          className={styles.textInput}
+                          value={histogramData.processCapability.usl}
+                          onChange={(e) => handleCapabilityChange('usl', e.target.value)}
+                          placeholder="USL"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className={styles.capabilityIndices}>
+                    <h3>Capability Indices</h3>
+                    <div className={styles.indicesGrid}>
+                      <div className={styles.indexCard}>
+                        <span className={styles.indexLabel}>Cp</span>
+                        <span className={styles.indexValue}>{histogramData.processCapability.cp}</span>
+                        <span className={styles.indexDescription}>Potential Capability</span>
+                      </div>
+                      <div className={styles.indexCard}>
+                        <span className={styles.indexLabel}>Cpk</span>
+                        <span className={styles.indexValue}>{histogramData.processCapability.cpk}</span>
+                        <span className={styles.indexDescription}>Actual Capability</span>
+                      </div>
+                      <div className={styles.indexCard}>
+                        <span className={styles.indexLabel}>Pp</span>
+                        <span className={styles.indexValue}>{histogramData.processCapability.pp}</span>
+                        <span className={styles.indexDescription}>Process Performance</span>
+                      </div>
+                      <div className={styles.indexCard}>
+                        <span className={styles.indexLabel}>Ppk</span>
+                        <span className={styles.indexValue}>{histogramData.processCapability.ppk}</span>
+                        <span className={styles.indexDescription}>Process Performance Index</span>
+                      </div>
+                      <div className={styles.indexCard}>
+                        <span className={styles.indexLabel}>Sigma Level</span>
+                        <span className={styles.indexValue}>{histogramData.processCapability.sigmaLevel}</span>
+                        <span className={styles.indexDescription}>Process Sigma</span>
+                      </div>
+                      <div className={styles.indexCard}>
+                        <span className={styles.indexLabel}>Yield</span>
+                        <span className={styles.indexValue}>{histogramData.processCapability.yield}%</span>
+                        <span className={styles.indexDescription}>Process Yield</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Insights & Interpretation Section */}
+          <div className={styles.analysisCard}>
+            <h2>Insights & Interpretation</h2>
+            <div className={styles.insightsSection}>
               <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Next Steps</label>
+                <label className={styles.fieldLabel}>
+                  Distribution Analysis <span className={styles.required}>*</span>
+                </label>
                 <textarea
                   className={styles.textareaInput}
-                  value={histogramData.insights.nextSteps}
-                  onChange={(e) => handleInsightsChange('nextSteps', e.target.value)}
-                  placeholder="What are the next steps?"
-                  rows={2}
+                  value={histogramData.insights.distributionAnalysis}
+                  onChange={(e) => handleInsightsChange('distributionAnalysis', e.target.value)}
+                  placeholder="What does the distribution shape tell you about the process?"
+                  rows={3}
                 />
+              </div>
+              
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>Process Insights</label>
+                <textarea
+                  className={styles.textareaInput}
+                  value={histogramData.insights.processInsights}
+                  onChange={(e) => handleInsightsChange('processInsights', e.target.value)}
+                  placeholder="What insights about the process can you derive from this histogram?"
+                  rows={3}
+                />
+              </div>
+              
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>Recommendations</label>
+                <textarea
+                  className={styles.textareaInput}
+                  value={histogramData.insights.recommendations}
+                  onChange={(e) => handleInsightsChange('recommendations', e.target.value)}
+                  placeholder="What recommendations do you have based on this analysis?"
+                  rows={3}
+                />
+              </div>
+              
+              <div className={styles.actionItemsSection}>
+                <div className={styles.sectionHeader}>
+                  <h3>Action Items</h3>
+                  <button className={styles.addBtn} onClick={addActionItem}>
+                    <i className="fas fa-plus"></i> Add Action
+                  </button>
+                </div>
+                
+                <div className={styles.actionItemsList}>
+                  {histogramData.insights.actionItems.map((action) => (
+                    <div key={action.id} className={styles.actionItem}>
+                      <input
+                        type="text"
+                        className={styles.actionInput}
+                        value={action.action}
+                        onChange={(e) => handleActionItemChange(action.id, 'action', e.target.value)}
+                        placeholder="Action item"
+                      />
+                      <input
+                        type="text"
+                        className={styles.actionInput}
+                        value={action.owner}
+                        onChange={(e) => handleActionItemChange(action.id, 'owner', e.target.value)}
+                        placeholder="Owner"
+                      />
+                      <input
+                        type="date"
+                        className={styles.actionInput}
+                        value={action.dueDate}
+                        onChange={(e) => handleActionItemChange(action.id, 'dueDate', e.target.value)}
+                      />
+                      <select
+                        className={styles.actionSelect}
+                        value={action.priority}
+                        onChange={(e) => handleActionItemChange(action.id, 'priority', e.target.value)}
+                      >
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                      </select>
+                      <button
+                        className={styles.removeBtn}
+                        onClick={() => removeActionItem(action.id)}
+                      >
+                        <i className="fas fa-times"></i>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              <div className={styles.fieldRow}>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Follow-up Required</label>
+                  <label className={styles.checkboxLabel}>
+                    <input
+                      type="checkbox"
+                      checked={histogramData.insights.followUpRequired}
+                      onChange={(e) => handleInsightsChange('followUpRequired', e.target.checked)}
+                    />
+                    Additional analysis or data collection needed
+                  </label>
+                </div>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Next Steps</label>
+                  <textarea
+                    className={styles.textareaInput}
+                    value={histogramData.insights.nextSteps}
+                    onChange={(e) => handleInsightsChange('nextSteps', e.target.value)}
+                    placeholder="What are the next steps?"
+                    rows={2}
+                  />
+                </div>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Documentation Section */}
-        <div className={styles.analysisCard}>
-          <h2>Documentation</h2>
-          <div className={styles.documentationGrid}>
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>
-                Methodology <span className={styles.required}>*</span>
-              </label>
-              <textarea
-                className={styles.textareaInput}
-                value={histogramData.documentation.methodology}
-                onChange={(e) => handleDocumentationChange('methodology', e.target.value)}
-                placeholder="Describe the methodology used for data collection and analysis"
-                rows={3}
-              />
-            </div>
-            
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>Data Quality Assessment</label>
-              <textarea
-                className={styles.textareaInput}
-                value={histogramData.documentation.dataQuality}
-                onChange={(e) => handleDocumentationChange('dataQuality', e.target.value)}
-                placeholder="Assess the quality and reliability of the data"
-                rows={3}
-              />
-            </div>
-            
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>Limitations</label>
-              <textarea
-                className={styles.textareaInput}
-                value={histogramData.documentation.limitations}
-                onChange={(e) => handleDocumentationChange('limitations', e.target.value)}
-                placeholder="What are the limitations of this analysis?"
-                rows={3}
-              />
-            </div>
-            
-            <div className={styles.fieldRow}>
+          {/* Documentation Section (last card -> no bottom margin) */}
+          <div className={styles.analysisCard} style={{ marginBottom: 0 }}>
+            <h2>Documentation</h2>
+            <div className={styles.documentationGrid}>
               <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Assumptions</label>
+                <label className={styles.fieldLabel}>
+                  Methodology <span className={styles.required}>*</span>
+                </label>
                 <textarea
                   className={styles.textareaInput}
-                  value={histogramData.documentation.assumptions}
-                  onChange={(e) => handleDocumentationChange('assumptions', e.target.value)}
-                  placeholder="What assumptions were made?"
-                  rows={2}
+                  value={histogramData.documentation.methodology}
+                  onChange={(e) => handleDocumentationChange('methodology', e.target.value)}
+                  placeholder="Describe the methodology used for data collection and analysis"
+                  rows={3}
                 />
               </div>
+              
               <div className={styles.fieldGroup}>
-                <label className={styles.fieldLabel}>Approver</label>
-                <input
-                  type="text"
-                  className={styles.textInput}
-                  value={histogramData.documentation.approver}
-                  onChange={(e) => handleDocumentationChange('approver', e.target.value)}
-                  placeholder="Who approved this analysis?"
+                <label className={styles.fieldLabel}>Data Quality Assessment</label>
+                <textarea
+                  className={styles.textareaInput}
+                  value={histogramData.documentation.dataQuality}
+                  onChange={(e) => handleDocumentationChange('dataQuality', e.target.value)}
+                  placeholder="Assess the quality and reliability of the data"
+                  rows={3}
                 />
+              </div>
+              
+              <div className={styles.fieldGroup}>
+                <label className={styles.fieldLabel}>Limitations</label>
+                <textarea
+                  className={styles.textareaInput}
+                  value={histogramData.documentation.limitations}
+                  onChange={(e) => handleDocumentationChange('limitations', e.target.value)}
+                  placeholder="What are the limitations of this analysis?"
+                  rows={3}
+                />
+              </div>
+              
+              <div className={styles.fieldRow}>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Assumptions</label>
+                  <textarea
+                    className={styles.textareaInput}
+                    value={histogramData.documentation.assumptions}
+                    onChange={(e) => handleDocumentationChange('assumptions', e.target.value)}
+                    placeholder="What assumptions were made?"
+                    rows={2}
+                  />
+                </div>
+                <div className={styles.fieldGroup}>
+                  <label className={styles.fieldLabel}>Approver</label>
+                  <input
+                    type="text"
+                    className={styles.textInput}
+                    value={histogramData.documentation.approver}
+                    onChange={(e) => handleDocumentationChange('approver', e.target.value)}
+                    placeholder="Who approved this analysis?"
+                  />
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </ResourcePageWrapper>
   );
 };
 
 export default Histogram;
-

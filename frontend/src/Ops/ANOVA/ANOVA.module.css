@@ -122,18 +122,18 @@
 
 /* ===== TOP SECTION - EXACT MATCH TO OTHER TOOLS ===== */
 .topSection {
-  display: grid;
-  grid-template-columns: 1fr 400px;
+  display: flex;
+  flex-direction: column;
   gap: 2rem;
+  margin-bottom: 2rem;
 }
 
-/* ===== PROCESS INFORMATION CARD - EXACT MATCH TO OTHER TOOLS ===== */
 .processInfoCard {
-  background-color: var(--lss-white);
-  border-radius: 1rem;
+  width: 100%;
+  background: white;
+  border-radius: 8px;
   padding: 2rem;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  border: 1px solid var(--lss-gray-200);
 }
 
 .processInfoCard h2 {

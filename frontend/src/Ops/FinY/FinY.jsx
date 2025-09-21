@@ -1,8 +1,13 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { DragDropContext, Droppable, Draggable } from 'react-beautiful-dnd';
+import { useAdminSettings } from '../context/AdminContext';
+import ResourcePageWrapper from '../../All/components/ResourcePageWrapper';
 import styles from './FinY.module.css';
 import { aiPredictionEngine } from './aiPredictionEngine';
 
 const FinY = () => {
+    const { adminSettings } = useAdminSettings();
+
   // Project information
   const [projectInfo, setProjectInfo] = useState({
     name: 'Financial Benefits Analysis',
@@ -22,8 +27,12 @@ const FinY = () => {
     trendAnalysis: true
   });
 
-  // Section order state
-  const [sectionOrder, setSectionOrder] = useState(['baseline', 'actual', 'projected']);
+  // Section order state - Enhanced with drag and drop
+  const [sectionOrder, setSectionOrder] = useState([
+    { id: 'baseline', type: 'baseline' },
+    { id: 'actual', type: 'actual' },
+    { id: 'projected', type: 'projected' }
+  ]);
 
   // Metrics data
   const [metrics, setMetrics] = useState([
@@ -70,45 +79,89 @@ const FinY = () => {
     irr: 0
   });
 
-  // Chat state for AI helper
-  const [showAIHelper, setShowAIHelper] = useState(true);
-  const [aiMessages, setAiMessages] = useState([
-    {
-      id: 1,
-      type: 'ai',
-      content: 'Welcome to the FinY Benefit Model! I can help you with financial projections, ROI calculations, and benefit tracking. What would you like to analyze?',
-      timestamp: new Date()
-    }
-  ]);
-  const [currentMessage, setCurrentMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
 
-  // Section info helper
+  // Handle data updates from Kii
+  const handleKiiDataUpdate = useCallback((extractedData) => {
+    console.log('Kii extracted data for FinY:', extractedData);
+    
+    if (extractedData.projectTitle) {
+      setProjectInfo(prev => ({ ...prev, name: extractedData.projectTitle }));
+    }
+
+    if (extractedData.cost) {
+      setProjectInfo(prev => ({
+        ...prev,
+        totalInvestment: parseFloat(extractedData.cost.replace(/[^0-9.-]+/g, '')) || 0
+      }));
+    }
+
+    if (extractedData.timeframe) {
+      const timeMatch = extractedData.timeframe.match(/(\d+)\s*(month|year)/i);
+      if (timeMatch) {
+        const value = parseInt(timeMatch[1]);
+        const unit = timeMatch[2].toLowerCase();
+        const months = unit === 'year' ? value * 12 : value;
+        
+        const endDate = new Date();
+        endDate.setMonth(endDate.getMonth() + months);
+        
+        setProjectInfo(prev => ({
+          ...prev,
+          endDate: endDate.toISOString().split('T')[0]
+        }));
+      }
+    }
+
+    // Show visual feedback
+    Object.keys(extractedData).forEach(fieldName => {
+      const element = document.querySelector(`[data-field="${fieldName}"]`);
+      if (element) {
+        element.classList.add(styles.fieldUpdated);
+        setTimeout(() => element.classList.remove(styles.fieldUpdated), 2000);
+      }
+    });
+  }, []);
+
+  // Enhanced section info helper
   const getSectionInfo = (sectionType) => {
     const sectionMap = {
       baseline: {
         title: 'Baseline Values',
         description: 'Starting performance metrics before improvements',
         icon: 'fas fa-chart-line',
-        editable: true
+        editable: true,
+        color: '#3b82f6'
       },
       actual: {
         title: 'Actual Values',
         description: 'Real performance data as improvements are implemented',
         icon: 'fas fa-chart-bar',
-        editable: true
+        editable: true,
+        color: '#10b981'
       },
       projected: {
         title: 'AI Projected Values',
-        description: 'AI-generated predictions based on current trends',
+        description: 'AI-generated predictions based on current trends and patterns',
         icon: 'fas fa-robot',
-        editable: false
+        editable: !aiSettings.enabled, // FIXED: Editable when AI is disabled
+        color: '#8b5cf6'
       }
     };
     return sectionMap[sectionType];
   };
 
-  // Section reordering functions
+  // Enhanced drag and drop handler
+  const handleDragEnd = (result) => {
+    if (!result.destination) return;
+
+    const items = Array.from(sectionOrder);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    setSectionOrder(items);
+  };
+
+  // Legacy section reordering functions (kept for backward compatibility)
   const moveSectionUp = (index) => {
     if (index > 0) {
       const newOrder = [...sectionOrder];
@@ -125,12 +178,14 @@ const FinY = () => {
     }
   };
 
-  // Handle metric data updates
+  // Enhanced metric data updates with validation
   const updateMetricValue = (metricIndex, periodIndex, type, value) => {
+    const numValue = parseFloat(value) || 0;
+    
     setMetrics(prev => prev.map((metric, index) => {
       if (index === metricIndex) {
         const newData = [...metric[type]];
-        newData[periodIndex] = parseFloat(value) || 0;
+        newData[periodIndex] = numValue;
         return { ...metric, [type]: newData };
       }
       return metric;
@@ -157,11 +212,11 @@ const FinY = () => {
     }));
   };
 
-  // Add new metric
+  // Enhanced add metric with better defaults
   const addMetric = () => {
     const newMetric = {
       id: Date.now(),
-      name: 'New Metric',
+      name: `New Metric ${metrics.length + 1}`,
       category: 'Efficiency',
       unit: 'Units',
       financialImpact: 'Cost Reduction',
@@ -181,7 +236,7 @@ const FinY = () => {
     }
   };
 
-  // AI Prediction Engine
+  // Enhanced AI Prediction Engine
   const generateAIPredictions = useCallback(async (metricData, metricIndex) => {
     if (!aiSettings.enabled) {
       return metricData.baseline;
@@ -209,8 +264,16 @@ const FinY = () => {
       return metricData.baseline;
     } catch (error) {
       console.error('AI prediction failed:', error);
-      // Fallback to simple prediction logic
-      return metricData.baseline.map((val, i) => val * (1 + 0.05 * (i + 1) / 12));
+      // Enhanced fallback with trend analysis
+      const baselineSum = metricData.baseline.reduce((sum, val) => sum + val, 0);
+      const actualSum = metricData.actual.reduce((sum, val) => sum + val, 0);
+      const improvementRate = baselineSum > 0 ? (actualSum - baselineSum) / baselineSum : 0.05;
+      
+      return metricData.baseline.map((val, i) => {
+        const trendFactor = 1 + (improvementRate * (i + 1) / 12);
+        const seasonalFactor = 1 + 0.1 * Math.sin((i * Math.PI) / 6); // Seasonal variation
+        return val * trendFactor * seasonalFactor;
+      });
     }
   }, [aiSettings]);
 
@@ -242,17 +305,30 @@ const FinY = () => {
       aiSettings.enabled, aiSettings.model, aiSettings.confidence, 
       aiSettings.seasonality, aiSettings.trendAnalysis, generateAIPredictions]);
 
-  // Calculate financial summary
+  // Enhanced financial summary calculation
   useEffect(() => {
     const calculateSummary = () => {
       let totalBenefit = 0;
       let totalCost = projectInfo.totalInvestment;
+      let monthlyBenefits = Array(12).fill(0);
 
       metrics.forEach(metric => {
         const actualSum = metric.actual.reduce((sum, val) => sum + val, 0);
         const baselineSum = metric.baseline.reduce((sum, val) => sum + val, 0);
         const improvement = actualSum - baselineSum;
         const benefit = improvement * metric.costPerUnit;
+        
+        // Calculate monthly benefits for better payback analysis
+        metric.actual.forEach((actualVal, monthIndex) => {
+          const monthlyImprovement = actualVal - (metric.baseline[monthIndex] || 0);
+          const monthlyBenefit = monthlyImprovement * metric.costPerUnit;
+          
+          if (metric.financialImpact === 'Cost Reduction' || metric.financialImpact === 'Cost Avoidance') {
+            monthlyBenefits[monthIndex] += Math.abs(monthlyBenefit);
+          } else if (metric.financialImpact === 'Revenue Increase') {
+            monthlyBenefits[monthIndex] += monthlyBenefit;
+          }
+        });
         
         if (metric.financialImpact === 'Cost Reduction' || metric.financialImpact === 'Cost Avoidance') {
           totalBenefit += Math.abs(benefit);
@@ -263,7 +339,27 @@ const FinY = () => {
 
       const netBenefit = totalBenefit - totalCost;
       const roi = totalCost > 0 ? (netBenefit / totalCost) * 100 : 0;
-      const paybackPeriod = totalBenefit > 0 ? Math.ceil(totalCost / (totalBenefit / 12)) : 0;
+      
+      // Enhanced payback period calculation
+      let cumulativeBenefit = 0;
+      let paybackPeriod = 0;
+      for (let i = 0; i < monthlyBenefits.length; i++) {
+        cumulativeBenefit += monthlyBenefits[i];
+        if (cumulativeBenefit >= totalCost) {
+          paybackPeriod = i + 1;
+          break;
+        }
+      }
+      if (paybackPeriod === 0 && totalBenefit > 0) {
+        paybackPeriod = Math.ceil(totalCost / (totalBenefit / 12));
+      }
+
+      // Enhanced NPV calculation
+      const discountRate = projectInfo.discountRate / 100 / 12; // Monthly discount rate
+      let npv = -totalCost;
+      monthlyBenefits.forEach((benefit, month) => {
+        npv += benefit / Math.pow(1 + discountRate, month + 1);
+      });
 
       const newSummary = {
         totalBenefit,
@@ -271,7 +367,7 @@ const FinY = () => {
         netBenefit,
         roi,
         paybackPeriod,
-        npv: netBenefit, // Simplified NPV calculation
+        npv,
         irr: roi // Simplified IRR approximation
       };
 
@@ -293,63 +389,29 @@ const FinY = () => {
     calculateSummary();
   }, [metrics, projectInfo.totalInvestment, projectInfo.discountRate]);
 
-  // AI Chat functions
-  const sendAIMessage = () => {
-    if (!currentMessage.trim()) return;
-
-    const userMessage = {
-      id: Date.now(),
-      type: 'user',
-      content: currentMessage,
-      timestamp: new Date()
-    };
-
-    setAiMessages(prev => [...prev, userMessage]);
-    setCurrentMessage('');
-    setIsTyping(true);
-
-    setTimeout(() => {
-      const aiResponse = {
-        id: Date.now() + 1,
-        type: 'ai',
-        content: generateAIResponse(currentMessage),
-        timestamp: new Date()
-      };
-      setAiMessages(prev => [...prev, aiResponse]);
-      setIsTyping(false);
-    }, 1500);
-  };
-
-  const generateAIResponse = (userMessage) => {
-    const responses = {
-      'roi': `Your current ROI is ${financialSummary.roi.toFixed(1)}%. This ${financialSummary.roi >= 0 ? 'positive' : 'negative'} return indicates ${financialSummary.roi >= 0 ? 'value creation' : 'value destruction'} from your investment.`,
-      'payback': `Your payback period is ${financialSummary.paybackPeriod} months. Consider focusing on high-impact, low-effort improvements to accelerate payback.`,
-      'metrics': 'Focus on metrics with the highest financial impact per unit. Cost reduction metrics typically show faster returns than revenue increase metrics.',
-      'predictions': 'AI predictions are based on trend analysis and seasonality patterns. Enable different models (neural network, time series) for more sophisticated forecasting.',
-      'default': 'I can help with ROI analysis, payback calculations, metric prioritization, and AI prediction insights. What specific aspect would you like to explore?'
-    };
-
-    const lowerMessage = userMessage.toLowerCase();
-    for (const [key, response] of Object.entries(responses)) {
-      if (lowerMessage.includes(key)) {
-        return response;
-      }
-    }
-    return responses.default;
-  };
-
-  const handleQuickAction = (message) => {
-    setCurrentMessage(message);
-  };
-
-  // Export data
+  // Enhanced export data with more details
   const exportData = () => {
     const exportObj = {
       projectInfo,
       metrics,
       financialSummary,
       aiSettings,
-      exportDate: new Date().toISOString()
+      sectionOrder,
+      analysis: {
+        totalMetrics: metrics.length,
+        enabledFeatures: {
+          aiPredictions: aiSettings.enabled,
+          seasonalAnalysis: aiSettings.seasonality,
+          trendAnalysis: aiSettings.trendAnalysis
+        },
+        performanceIndicators: {
+          roi: financialSummary.roi,
+          paybackMonths: financialSummary.paybackPeriod,
+          npv: financialSummary.npv
+        }
+      },
+      exportDate: new Date().toISOString(),
+      version: '2.0-enhanced'
     };
     
     const dataStr = JSON.stringify(exportObj, null, 2);
@@ -357,8 +419,10 @@ const FinY = () => {
     const url = URL.createObjectURL(dataBlob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `finy-analysis-${projectInfo.name.replace(/\s+/g, '-').toLowerCase()}.json`;
+    link.download = `finy-analysis-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
 
@@ -368,23 +432,23 @@ const FinY = () => {
       <div className={styles.header}>
         <div className={styles.headerContent}>
           <div className={styles.projectInfo}>
-            <h1>FinY Benefit Model</h1>
+            <h1>
+              <i className="fas fa-chart-line"></i>
+              FinY Benefit Model
+            </h1>
             <div className={styles.projectDetails}>
-              <span className={styles.projectName}>{projectInfo.name}</span>
-              <span className={styles.projectTimeline}>
-                Set project timeline: {projectInfo.startDate || 'Not set'} - {projectInfo.endDate || 'Not set'}
-              </span>
+              <div className={styles.projectName} data-field="projectTitle">
+                {projectInfo.name}
+              </div>
+              <div className={styles.projectTimeline}>
+                {projectInfo.startDate && projectInfo.endDate && 
+                  `${projectInfo.startDate} - ${projectInfo.endDate}`
+                }
+              </div>
             </div>
           </div>
         </div>
         <div className={styles.headerActions}>
-          <button 
-            className={styles.helperToggleBtn}
-            onClick={() => setShowAIHelper(!showAIHelper)}
-          >
-            <i className={showAIHelper ? "fas fa-eye-slash" : "fas fa-eye"}></i>
-            {showAIHelper ? 'Hide Helper' : 'Show Helper'}
-          </button>
           <button className={styles.saveBtn}>
             <i className="fas fa-save"></i> Save Model
           </button>
@@ -396,8 +460,8 @@ const FinY = () => {
 
       {/* Main Content */}
       <div className={styles.mainContent}>
-        {/* Top Section - Financial Summary, Settings, and AI Helper */}
-        <div className={`${styles.topSection} ${showAIHelper ? styles.threeColumns : styles.twoColumns}`}>
+        {/* Top Section - Financial Summary and Settings (NO CHAT) */}
+        <div className={styles.topSection}>
           <div className={styles.summaryCard}>
             <h3>Financial Summary</h3>
             <div className={styles.summaryGrid}>
@@ -451,6 +515,7 @@ const FinY = () => {
                   value={projectInfo.name}
                   onChange={(e) => setProjectInfo(prev => ({ ...prev, name: e.target.value }))}
                   placeholder="Enter project name"
+                  data-field="projectTitle"
                 />
               </div>
               <div className={styles.fieldGroup}>
@@ -460,6 +525,7 @@ const FinY = () => {
                   className={styles.textInput}
                   value={projectInfo.startDate}
                   onChange={(e) => setProjectInfo(prev => ({ ...prev, startDate: e.target.value }))}
+                  data-field="startDate"
                 />
               </div>
               <div className={styles.fieldGroup}>
@@ -469,18 +535,19 @@ const FinY = () => {
                   className={styles.textInput}
                   value={projectInfo.endDate}
                   onChange={(e) => setProjectInfo(prev => ({ ...prev, endDate: e.target.value }))}
+                  data-field="endDate"
                 />
               </div>
               <div className={styles.fieldGroup}>
-                <label>Total Investment</label>
+                <label>Total Investment ({projectInfo.currency})</label>
                 <input
                   type="number"
                   className={styles.textInput}
                   value={projectInfo.totalInvestment}
                   onChange={(e) => setProjectInfo(prev => ({ ...prev, totalInvestment: parseFloat(e.target.value) || 0 }))}
                   placeholder="0"
-                  min="0"
-                  step="1000"
+                  step="100"
+                  data-field="totalInvestment"
                 />
               </div>
               <div className={styles.fieldGroup}>
@@ -489,11 +556,12 @@ const FinY = () => {
                   type="number"
                   className={styles.textInput}
                   value={projectInfo.discountRate}
-                  onChange={(e) => setProjectInfo(prev => ({ ...prev, discountRate: parseFloat(e.target.value) || 0 }))}
+                  onChange={(e) => setProjectInfo(prev => ({ ...prev, discountRate: parseFloat(e.target.value) || 10 }))}
                   placeholder="10"
-                  min="0"
-                  max="100"
                   step="0.1"
+                  min="0"
+                  max="50"
+                  data-field="discountRate"
                 />
               </div>
               <div className={styles.fieldGroup}>
@@ -535,245 +603,164 @@ const FinY = () => {
               </div>
             </div>
           </div>
-
-          {/* AI Helper Card in Top Section */}
-          {showAIHelper && (
-            <div className={styles.chatSection}>
-              <div className={styles.chatCard}>
-                <div className={styles.chatHeader}>
-                  <h3>
-                    <i className="fas fa-robot"></i>
-                    FinY AI Assistant
-                  </h3>
-                  <div className={styles.chatStatus}>
-                    {isTyping ? (
-                      <span className={styles.typing}>
-                        <i className="fas fa-circle"></i>
-                        <i className="fas fa-circle"></i>
-                        <i className="fas fa-circle"></i>
-                      </span>
-                    ) : (
-                      <span className={styles.online}>Online</span>
-                    )}
-                  </div>
-                </div>
-
-                <div className={styles.chatMessages}>
-                  {aiMessages.map((message) => (
-                    <div 
-                      key={message.id} 
-                      className={`${styles.message} ${styles[message.type]}`}
-                    >
-                      <div className={styles.messageContent}>
-                        {message.content}
-                      </div>
-                      <div className={styles.messageTime}>
-                        {message.timestamp.toLocaleTimeString([], { 
-                          hour: '2-digit', 
-                          minute: '2-digit' 
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                  {isTyping && (
-                    <div className={`${styles.message} ${styles.ai}`}>
-                      <div className={styles.typingIndicator}>
-                        <span></span>
-                        <span></span>
-                        <span></span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                <div className={styles.chatInput}>
-                  <input
-                    type="text"
-                    value={currentMessage}
-                    onChange={(e) => setCurrentMessage(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && sendAIMessage()}
-                    placeholder="Ask me about ROI, predictions, or financial analysis..."
-                    className={styles.messageInput}
-                  />
-                  <button 
-                    onClick={sendAIMessage}
-                    className={styles.sendBtn}
-                    disabled={!currentMessage.trim()}
-                  >
-                    <i className="fas fa-paper-plane"></i>
-                  </button>
-                </div>
-
-                <div className={styles.quickActions}>
-                  <h4>Quick Help</h4>
-                  <div className={styles.actionButtons}>
-                    <button 
-                      className={styles.quickBtn}
-                      onClick={() => handleQuickAction('What is my current ROI?')}
-                    >
-                      ROI Analysis
-                    </button>
-                    <button 
-                      className={styles.quickBtn}
-                      onClick={() => handleQuickAction('How can I improve payback period?')}
-                    >
-                      Payback Tips
-                    </button>
-                    <button 
-                      className={styles.quickBtn}
-                      onClick={() => handleQuickAction('Which metrics have highest impact?')}
-                    >
-                      Top Metrics
-                    </button>
-                    <button 
-                      className={styles.quickBtn}
-                      onClick={() => handleQuickAction('Explain AI predictions')}
-                    >
-                      AI Insights
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Data Sections - Full Width */}
+        {/* Enhanced Data Sections with Drag and Drop */}
         <div className={styles.analysisCard}>
           <h2>Metrics & Financial Data</h2>
           <div className={styles.tableActions}>
+            <div className={styles.dragHint}>
+              <i className="fas fa-hand-rock"></i>
+              Drag sections to reorder
+            </div>
             <button className={styles.addBtn} onClick={addMetric}>
               <i className="fas fa-plus"></i> Add Metric
             </button>
           </div>
 
-          {/* Render sections in user-defined order */}
-          {sectionOrder.map((sectionType, sectionIndex) => {
-            const sectionInfo = getSectionInfo(sectionType);
-            return (
-              <div key={sectionType} className={styles.dataSection}>
-                <div className={styles.sectionHeader}>
-                  <div className={styles.sectionTitle}>
-                    <h4>
-                      <i className={sectionInfo.icon}></i>
-                      {sectionInfo.title}
-                    </h4>
-                    <span className={styles.sectionDescription}>{sectionInfo.description}</span>
-                  </div>
-                  <div className={styles.sectionControls}>
-                    <button 
-                      className={styles.moveBtn}
-                      onClick={() => moveSectionUp(sectionIndex)}
-                      disabled={sectionIndex === 0}
-                      title="Move section up"
-                    >
-                      <i className="fas fa-chevron-up"></i>
-                    </button>
-                    <button 
-                      className={styles.moveBtn}
-                      onClick={() => moveSectionDown(sectionIndex)}
-                      disabled={sectionIndex === sectionOrder.length - 1}
-                      title="Move section down"
-                    >
-                      <i className="fas fa-chevron-down"></i>
-                    </button>
-                  </div>
-                </div>
-
-                <div className={styles.sectionTableContainer}>
-                  <table className={styles.sectionTable}>
-                    <thead>
-                      <tr>
-                        <th>Metric</th>
-                        <th>Category</th>
-                        <th>Unit</th>
-                        <th>Impact</th>
-                        <th>$/Unit</th>
-                        {periods.map(period => (
-                          <th key={period}>{period}</th>
-                        ))}
-                        {sectionType === 'baseline' && <th>Actions</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {metrics.map((metric, metricIndex) => (
-                        <tr key={metric.id}>
-                          <td className={styles.metricName}>
-                            <div className={styles.metricInfo}>
-                              <strong>{metric.name}</strong>
+          {/* Drag and Drop Context */}
+          <DragDropContext onDragEnd={handleDragEnd}>
+            <Droppable droppableId="sections">
+              {(provided) => (
+                <div {...provided.droppableProps} ref={provided.innerRef}>
+                  {sectionOrder.map((section, sectionIndex) => {
+                    const sectionInfo = getSectionInfo(section.type);
+                    return (
+                      <Draggable key={section.id} draggableId={section.id} index={sectionIndex}>
+                        {(provided, snapshot) => (
+                          <div
+                            ref={provided.innerRef}
+                            {...provided.draggableProps}
+                            className={`${styles.dataSection} ${snapshot.isDragging ? styles.dragging : ''}`}
+                          >
+                            <div className={styles.sectionHeader} {...provided.dragHandleProps}>
+                              <div className={styles.sectionTitle}>
+                                <h4 style={{ color: sectionInfo.color }}>
+                                  <i className={sectionInfo.icon}></i>
+                                  {sectionInfo.title}
+                                  {section.type === 'projected' && aiSettings.enabled && (
+                                    <span className={styles.enhancedBadge}>AI</span>
+                                  )}
+                                  <i className="fas fa-grip-vertical" style={{ marginLeft: '0.5rem', opacity: 0.5 }}></i>
+                                </h4>
+                                <span className={styles.sectionDescription}>{sectionInfo.description}</span>
+                              </div>
+                              <div className={styles.sectionControls}>
+                                <button 
+                                  className={styles.moveBtn}
+                                  onClick={() => moveSectionUp(sectionIndex)}
+                                  disabled={sectionIndex === 0}
+                                  title="Move section up"
+                                >
+                                  <i className="fas fa-chevron-up"></i>
+                                </button>
+                                <button 
+                                  className={styles.moveBtn}
+                                  onClick={() => moveSectionDown(sectionIndex)}
+                                  disabled={sectionIndex === sectionOrder.length - 1}
+                                  title="Move section down"
+                                >
+                                  <i className="fas fa-chevron-down"></i>
+                                </button>
+                              </div>
                             </div>
-                          </td>
-                          <td>{metric.category}</td>
-                          <td>{metric.unit}</td>
-                          <td>
-                            <select
-                              className={styles.selectInput}
-                              value={metric.financialImpact}
-                              onChange={(e) => updateMetricImpact(metricIndex, e.target.value)}
-                              disabled={!sectionInfo.editable}
-                            >
-                              <option value="Cost Reduction">Cost Reduction</option>
-                              <option value="Revenue Increase">Revenue Increase</option>
-                              <option value="Cost Avoidance">Cost Avoidance</option>
-                              <option value="Quality Improvement">Quality Improvement</option>
-                            </select>
-                          </td>
-                          <td>
-                            <input
-                              type="number"
-                              className={styles.tableInput}
-                              value={metric.costPerUnit}
-                              onChange={(e) => updateMetricCostPerUnit(metricIndex, e.target.value)}
-                              step="0.01"
-                              min="0"
-                              placeholder="0"
-                              disabled={!sectionInfo.editable}
-                            />
-                          </td>
-                          {periods.map((period, periodIndex) => (
-                            <td key={period}>
-                              {sectionType === 'projected' ? (
-                                <span className={styles.projectedValue}>
-                                  {metric.projected[periodIndex]?.toFixed(2) || '0.00'}
-                                </span>
-                              ) : (
-                                <input
-                                  type="number"
-                                  className={styles.tableInput}
-                                  value={metric[sectionType][periodIndex]}
-                                  onChange={(e) => updateMetricValue(metricIndex, periodIndex, sectionType, e.target.value)}
-                                  step="0.01"
-                                  min="0"
-                                  placeholder="0"
-                                />
-                              )}
-                            </td>
-                          ))}
-                          {sectionType === 'baseline' && (
-                            <td>
-                              <button
-                                className={styles.removeBtn}
-                                onClick={() => removeMetric(metricIndex)}
-                                disabled={metrics.length <= 1}
-                                title="Remove metric"
-                              >
-                                <i className="fas fa-trash"></i>
-                              </button>
-                            </td>
-                          )}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+
+                            <div className={styles.sectionTableContainer}>
+                              <table className={styles.sectionTable}>
+                                <thead>
+                                  <tr>
+                                    <th>Metric</th>
+                                    <th>Category</th>
+                                    <th>Unit</th>
+                                    <th>Impact</th>
+                                    <th>$/Unit</th>
+                                    {periods.map(period => (
+                                      <th key={period}>{period}</th>
+                                    ))}
+                                    {section.type === 'baseline' && <th>Actions</th>}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {metrics.map((metric, metricIndex) => (
+                                    <tr key={metric.id}>
+                                      <td className={styles.metricName}>
+                                        <div className={styles.metricInfo}>
+                                          <strong>{metric.name}</strong>
+                                        </div>
+                                      </td>
+                                      <td>{metric.category}</td>
+                                      <td>{metric.unit}</td>
+                                      <td>
+                                        <select
+                                          className={styles.selectInput}
+                                          value={metric.financialImpact}
+                                          onChange={(e) => updateMetricImpact(metricIndex, e.target.value)}
+                                          disabled={!sectionInfo.editable}
+                                        >
+                                          <option value="Cost Reduction">Cost Reduction</option>
+                                          <option value="Cost Avoidance">Cost Avoidance</option>
+                                          <option value="Revenue Increase">Revenue Increase</option>
+                                        </select>
+                                      </td>
+                                      <td>
+                                        <input
+                                          type="number"
+                                          className={styles.numberInput}
+                                          value={metric.costPerUnit}
+                                          onChange={(e) => updateMetricCostPerUnit(metricIndex, e.target.value)}
+                                          disabled={!sectionInfo.editable}
+                                          step="0.01"
+                                        />
+                                      </td>
+                                      {periods.map((period, periodIndex) => (
+                                        <td key={period}>
+                                          <input
+                                            type="number"
+                                            className={styles.numberInput}
+                                            value={metric[section.type][periodIndex] || 0}
+                                            onChange={(e) => updateMetricValue(metricIndex, periodIndex, section.type, e.target.value)}
+                                            disabled={!sectionInfo.editable}
+                                            step="0.01"
+                                          />
+                                        </td>
+                                      ))}
+                                      {section.type === 'baseline' && (
+                                        <td>
+                                          <button
+                                            className={styles.removeBtn}
+                                            onClick={() => removeMetric(metricIndex)}
+                                            disabled={metrics.length === 1}
+                                          >
+                                            <i className="fas fa-trash"></i>
+                                          </button>
+                                        </td>
+                                      )}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {provided.placeholder}
                 </div>
-              </div>
-            );
-          })}
+              )}
+            </Droppable>
+          </DragDropContext>
         </div>
       </div>
+
+<ResourcePageWrapper 
+  pageName="FinY Benefit Model"
+  toolName="finy"
+  adminSettings={adminSettings}
+/>
+      
     </div>
   );
 };
 
 export default FinY;
-

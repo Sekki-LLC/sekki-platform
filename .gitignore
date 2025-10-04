@@ -1,4 +1,36 @@
+# Node/React
 node_modules/
+build/
+dist/
+.cache/
 *.log
+
+# Python
+venv/
+.env/
+__pycache__/
+*.pyc
+
+# Secrets (common places)
 .env
-docker-compose.override.yml
+*.env
+backend/.env
+frontend/.env
+app/.env
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local/runtime
+runtime/
+.tmp/
+temp/
+*.sqlite
+*.db
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

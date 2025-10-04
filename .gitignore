@@ -34,3 +34,8 @@ temp/
 Thumbs.db
 .vscode/
 .idea/
+# secrets
+.env
+*/.env
+secrets/*
+*.pem

@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  frontend:
+    image: node:16-alpine
+    working_dir: /app
+    volumes:
+      - ./frontend:/app          # mount your local code
+      - /app/node_modules        # preserve container modules
+    environment:
+      - CHOKIDAR_USEPOLLING=true # enable file‐watch in Docker
+    ports:
+      - "3000:3000"              # react‐scripts dev server
+    command: ["npm", "start"]   # hot‐reload dev server
+
+  api-gateway:
+    image: node:16-alpine
+    working_dir: /app
+    volumes:
+      - ./services/api-gateway:/app
+      - /app/node_modules
+    ports:
+      - "8000:8000"
+    command: ["node", "server.js"]

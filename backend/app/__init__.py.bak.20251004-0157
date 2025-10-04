@@ -1,7 +1,6 @@
 from .cookie_hooks import install_cookie_hooks
 import os
 from flask import Flask
-from .routes.market_iq_analyze import market_iq_analyze_bp
 from .routes.conversation import conversation_bp
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -128,7 +127,6 @@ def create_app():
     except Exception as e:
         print(f"DEBUG: failed to register conversational_ai_bp: {e}")
         app.register_blueprint(conversation_bp, url_prefix="/api/conversation")
-        app.register_blueprint(market_iq_analyze_bp, url_prefix="/api/market-iq")
     return app
 
 from app.routes.conversational_ai import conversational_ai_bp

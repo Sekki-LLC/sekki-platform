@@ -1,0 +1,41 @@
+nohup: ignoring input
+[2025-09-30 02:21:28 +0000] [183410] [INFO] Starting gunicorn 23.0.0
+[2025-09-30 02:21:28 +0000] [183410] [INFO] Listening at: http://127.0.0.1:8080 (183410)
+[2025-09-30 02:21:28 +0000] [183410] [INFO] Using worker: sync
+[2025-09-30 02:21:28 +0000] [183412] [INFO] Booting worker with pid: 183412
+[2025-09-30 02:21:28 +0000] [183413] [INFO] Booting worker with pid: 183413
+[2025-09-30 02:21:28 +0000] [183414] [INFO] Booting worker with pid: 183414
+[2025-09-30 02:55:44 +0000] [183410] [INFO] Handling signal: hup
+[2025-09-30 02:55:44 +0000] [183410] [INFO] Hang up: Master
+[2025-09-30 02:55:44 +0000] [183924] [INFO] Booting worker with pid: 183924
+[2025-09-30 02:55:44 +0000] [183410] [ERROR] Worker (pid:183414) was sent SIGHUP!
+[2025-09-30 02:55:44 +0000] [183925] [INFO] Booting worker with pid: 183925
+[2025-09-30 02:55:44 +0000] [183926] [INFO] Booting worker with pid: 183926
+[2025-09-30 02:55:44 +0000] [183410] [ERROR] Worker (pid:183412) was sent SIGHUP!
+[2025-09-30 02:55:44 +0000] [183410] [ERROR] Worker (pid:183413) was sent SIGHUP!
+INFO:app.routes.chat:Chat request from user 5e2cb312-077d-4072-a004-c3ea54eaf105: doc_type=market_analysis, phase=1, detailed=True
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:app.routes.chat:OpenAI response received for user 5e2cb312-077d-4072-a004-c3ea54eaf105
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:app.routes.chat:Chat request from user 5e2cb312-077d-4072-a004-c3ea54eaf105: doc_type=market_iq, phase=3, detailed=True
+INFO:httpx:HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 200 OK"
+INFO:app.routes.chat:OpenAI response received for user 5e2cb312-077d-4072-a004-c3ea54eaf105
+[2025-10-01 23:50:27 +0000] [183410] [INFO] Handling signal: term
+[2025-10-01 23:50:27 +0000] [183924] [INFO] Worker exiting (pid: 183924)
+DEBUG: About to register statistical analysis blueprint
+DEBUG: Attempting import...
+DEBUG: Import successful, registering blueprint...
+DEBUG: Statistical Analysis API registered successfully
+[2025-10-01 23:50:27 +0000] [183925] [INFO] Worker exiting (pid: 183925)
+DEBUG: About to register statistical analysis blueprint
+DEBUG: Attempting import...
+DEBUG: Import successful, registering blueprint...
+DEBUG: Statistical Analysis API registered successfully
+[2025-10-01 23:50:27 +0000] [183926] [INFO] Worker exiting (pid: 183926)
+DEBUG: About to register statistical analysis blueprint
+DEBUG: Attempting import...
+DEBUG: Import successful, registering blueprint...
+DEBUG: Statistical Analysis API registered successfully
+[2025-10-01 23:50:27 +0000] [183410] [ERROR] Worker (pid:183924) was sent SIGTERM!
+[2025-10-01 23:50:27 +0000] [183410] [ERROR] Worker (pid:183925) was sent SIGTERM!
+[2025-10-01 23:50:28 +0000] [183410] [INFO] Shutting down: Master

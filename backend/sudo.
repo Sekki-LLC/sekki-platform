@@ -1,0 +1,6 @@
+ExecStart={ path=/home/sekki/sekki-platform/backend/venv/bin/gunicorn ; argv[]=/home/sekki/sekki-platform/backend/venv/bin/gunicorn --workers 3 --threads 2 --timeout 120 --chdir /home/sekki/sekki-platform/backend --bind unix:/run/marketiq/app.sock -m 007 wsgi:app ; ignore_errors=no ; start_time=[Thu 2025-10-02 00:25:27 UTC] ; stop_time=[n/a] ; pid=239181 ; code=(null) ; status=0/0 }
+UMask=0007
+WorkingDirectory=/home/sekki/sekki-platform/backend
+User=sekki
+Group=www-data
+RuntimeDirectory=marketiq

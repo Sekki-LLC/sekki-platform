@@ -1,7 +1,7 @@
 # app/routes/chat.py
 
 import os
-import openai
+import anthropic
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 import logging
@@ -12,19 +12,18 @@ logger = logging.getLogger(__name__)
 
 chat_bp = Blueprint('chat', __name__)
 
-# Initialize OpenAI client
-def get_openai_client():
-    api_key = current_app.config.get('OPENAI_API_KEY')
+# Initialize Anthropic client
+def get_anthropic_client():
+    api_key = os.environ.get("ANTHROPIC_API_KEY") or current_app.config.get('ANTHROPIC_API_KEY')
     if not api_key:
-        raise ValueError("OPENAI_API_KEY not found in configuration")
-    return openai.OpenAI(api_key=api_key)
+        raise ValueError("ANTHROPIC_API_KEY not found in configuration")
+    return anthropic.Anthropic(api_key=api_key)
 
 @chat_bp.route('/chat', methods=['POST'], strict_slashes=False)
 @jwt_required()
 def chat():
     """
-    Handle chat requests from the Wizard component
-    Updated from basic echo to full OpenAI integration
+    Handle chat requests with full conversation history support for Claude
     """
     try:
         # Get current user
@@ -33,9 +32,11 @@ def chat():
         # Get request data
         payload = request.get_json() or {}
         user_message = payload.get('message', '').strip()
+        conversation_history = payload.get('conversation_history', [])
         doc_type = payload.get('docType', 'market_analysis')
         detailed = payload.get('detailed', True)
         system_prompt = payload.get('systemPrompt', '')
+        analysis_context = payload.get('analysis_context', {})
         phase = payload.get('phase', 1)
         
         if not user_message:
@@ -43,83 +44,89 @@ def chat():
         
         # If no system prompt provided, use a default one
         if not system_prompt:
-            system_prompt = "You are a helpful business analyst assistant. Provide detailed, professional advice."
+            system_prompt = "You are a top 0.1% senior market analyst providing detailed, conversational insights on business projects. Reference the analysis context when relevant and maintain a natural, helpful tone."
         
-        logger.info(f"Chat request from user {current_user_id}: doc_type={doc_type}, phase={phase}, detailed={detailed}")
+        # Add analysis context to system prompt if provided
+        if analysis_context:
+            import json
+            context_str = json.dumps(analysis_context, indent=2)
+            system_prompt += f"\n\nAnalysis Context:\n{context_str}"
         
-        # Initialize OpenAI client
-        client = get_openai_client()
+        logger.info(f"Chat request from user {current_user_id}: doc_type={doc_type}, phase={phase}, history_length={len(conversation_history)}")
         
-        # Prepare messages for OpenAI
-        messages = [
-            {
-                "role": "system",
-                "content": system_prompt
-            },
-            {
-                "role": "user", 
-                "content": user_message
-            }
-        ]
+        # Initialize Anthropic client
+        client = get_anthropic_client()
         
-        # Make request to OpenAI
+        # Prepare messages for Claude
+        # If conversation_history is provided, use it; otherwise start fresh
+        messages = []
+        
+        if conversation_history:
+            # Use the provided conversation history
+            messages = conversation_history
+        else:
+            # Start a new conversation
+            messages = [
+                {
+                    "role": "user",
+                    "content": user_message
+                }
+            ]
+        
+        # Make request to Claude
         try:
-            response = client.chat.completions.create(
-                model="gpt-4o",  # Use GPT-4o or gpt-4-turbo
-                messages=messages,
+            response = client.messages.create(
+                model="claude-3-5-sonnet-20241022",
                 max_tokens=2000,
                 temperature=0.7,
-                top_p=1,
-                frequency_penalty=0,
-                presence_penalty=0
+                system=system_prompt,
+                messages=messages
             )
             
             # Extract the reply
-            if response.choices and len(response.choices) > 0:
-                reply = response.choices[0].message.content
+            if response.content and len(response.content) > 0:
+                reply = response.content[0].text
                 
-                logger.info(f"OpenAI response received for user {current_user_id}")
+                logger.info(f"Claude response received for user {current_user_id}")
                 
                 return jsonify({
                     'success': True,
+                    'response': reply,
                     'reply': reply,
                     'usage': {
-                        'prompt_tokens': response.usage.prompt_tokens if response.usage else 0,
-                        'completion_tokens': response.usage.completion_tokens if response.usage else 0,
-                        'total_tokens': response.usage.total_tokens if response.usage else 0
+                        'input_tokens': response.usage.input_tokens if response.usage else 0,
+                        'output_tokens': response.usage.output_tokens if response.usage else 0,
                     }
                 })
             else:
-                logger.error("No choices in OpenAI response")
+                logger.error("No content in Claude response")
                 return jsonify({'error': 'No response from AI'}), 500
                 
-        except openai.RateLimitError as e:
-            logger.error(f"OpenAI rate limit error: {e}")
+        except anthropic.RateLimitError as e:
+            logger.error(f"Claude rate limit error: {e}")
             return jsonify({'error': 'Rate limit exceeded. Please try again later.'}), 429
             
-        except openai.AuthenticationError as e:
-            logger.error(f"OpenAI authentication error: {e}")
-            return jsonify({'error': 'API authentication failed. Please check your OpenAI API key.'}), 500
+        except anthropic.AuthenticationError as e:
+            logger.error(f"Claude authentication error: {e}")
+            return jsonify({'error': 'API authentication failed. Please check your Anthropic API key.'}), 500
             
-        except openai.APIError as e:
-            logger.error(f"OpenAI API error: {e}")
+        except anthropic.APIError as e:
+            logger.error(f"Claude API error: {e}")
             return jsonify({'error': f'API error: {str(e)}'}), 500
             
         except Exception as e:
-            logger.error(f"Unexpected OpenAI error: {e}")
+            logger.error(f"Unexpected Claude error: {e}")
             return jsonify({'error': f'Unexpected error: {str(e)}'}), 500
     
     except Exception as e:
         logger.error(f"Chat endpoint error: {e}")
         return jsonify({'error': f'Server error: {str(e)}'}), 500
 
-# Keep your existing route structure but add the main route
 @chat_bp.route('', methods=['POST'])
 @jwt_required()
 def chat_main():
     """
     Main chat route that matches the Wizard component's expected endpoint
-    This handles requests to /api/chat (without /chat suffix)
     """
     return chat()
 
@@ -130,31 +137,5 @@ def test_chat():
     """
     return jsonify({
         'message': 'Chat route is working',
-        'openai_configured': bool(current_app.config.get('OPENAI_API_KEY'))
+        'anthropic_configured': bool(os.environ.get("ANTHROPIC_API_KEY") or current_app.config.get('ANTHROPIC_API_KEY'))
     })
-
-@chat_bp.route('/models', methods=['GET'])
-@jwt_required()
-def get_available_models():
-    """
-    Get available OpenAI models
-    """
-    try:
-        client = get_openai_client()
-        models = client.models.list()
-        
-        # Filter for chat models
-        chat_models = [
-            model.id for model in models.data 
-            if 'gpt' in model.id.lower() and any(x in model.id for x in ['3.5', '4'])
-        ]
-        
-        return jsonify({
-            'success': True,
-            'models': sorted(chat_models)
-        })
-        
-    except Exception as e:
-        logger.error(f"Error fetching models: {e}")
-        return jsonify({'error': str(e)}), 500
-

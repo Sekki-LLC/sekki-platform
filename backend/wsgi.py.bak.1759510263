@@ -12,12 +12,6 @@ from app import create_app, db
 app = create_app( )
 
 
-from app.routes.market_iq_analyze import market_iq_analyze_bp
-app.register_blueprint(market_iq_analyze_bp, url_prefix='/api/market-iq')
-
-from app.routes.conversation import conversation_bp
-app.register_blueprint(conversation_bp, url_prefix='/api/conversation')
-
 migrate = Migrate(app, db)
 
 if __name__ == '__main__':

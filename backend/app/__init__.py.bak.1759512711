@@ -1,8 +1,6 @@
 from .cookie_hooks import install_cookie_hooks
 import os
 from flask import Flask
-from .routes.market_iq_analyze import market_iq_analyze_bp
-from .routes.conversation import conversation_bp
 from flask_cors import CORS
 from dotenv import load_dotenv
 import stripe
@@ -86,7 +84,7 @@ def create_app():
     # app.register_blueprint(chat_disabled,      url_prefix='/api/chat')
     app.register_blueprint(billing_bp,   url_prefix='/api/billing')
     app.register_blueprint(dashboard_bp)  # includes its own /api/dashboard path
-    # app.register_blueprint(market_iq_disabled, url_prefix="/api/market-iq")
+    app.register_blueprint(market_iq_bp, url_prefix="/api/market-iq")
     from app.routes.conversational_ai import conversational_ai_bp
     # app.register_blueprint(conversational_ai_bp, url_prefix='/api/market-iq')
 
@@ -106,7 +104,7 @@ def create_app():
         app.register_blueprint(statistical_bp, url_prefix='/api/statistical-analysis')
         print("DEBUG: Statistical Analysis API registered successfully")
     except ImportError as e:
-        pass  # silenced
+        print(f"DEBUG: Import error: {e}")
     except Exception as e:
         print(f"DEBUG: Other error: {e}")
         import traceback
@@ -114,21 +112,12 @@ def create_app():
 
     # Install cookie <-> Authorization bridge (safe, optional)
     install_cookie_hooks(app)
-    # SSE chat stream route (Claude)
-    try:
-        from app.routes.chat_stream import chat_stream_bp
-        app.register_blueprint(chat_stream_bp)
-    except Exception as e:
-        print(f"DEBUG: SSE register failed: {e}")
-
     # Register Claude conversational blueprint after app exists
     try:
         from app.routes.conversational_ai import conversational_ai_bp  # local import avoids early import issues
         app.register_blueprint(conversational_ai_bp, url_prefix="/api")  # exposes /api/chat
     except Exception as e:
         print(f"DEBUG: failed to register conversational_ai_bp: {e}")
-        app.register_blueprint(conversation_bp, url_prefix="/api/conversation")
-        app.register_blueprint(market_iq_analyze_bp, url_prefix="/api/market-iq")
     return app
 
 from app.routes.conversational_ai import conversational_ai_bp

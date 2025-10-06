@@ -39,3 +39,15 @@ Thumbs.db
 */.env
 secrets/*
 *.pem
+# sekki ignores
+.env
+*.env
+**/.env
+**/.env.*
+**/*.env.backup*
+**/*.env.bak*
+backend/.env*
+!/.env.example
+backend/venv/
+__pycache__/
+node_modules/

@@ -1,580 +1,135 @@
 """
-Conversational AI Route for Sekki Market IQ (In-Memory Version)
-Replaces rigid Q&A with intelligent, adaptive conversations
+Conversational AI Route for Sekki Market IQ — file-backed sessions (multi-worker safe)
 """
-
-import json
-import time
-import uuid
-import os
-from typing import Dict, List, Any, Optional
-from flask import Blueprint, request, jsonify, current_app
-import anthropic
-from datetime import datetime
+from __future__ import annotations
+import os, json, time, uuid
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+from flask import Blueprint, request, jsonify, current_app, make_response
 from dotenv import load_dotenv
+import anthropic
 
-# Load environment variables from .env file
+# Load .env early; systemd also injects env
 load_dotenv(dotenv_path='/home/sekki/sekki-platform/backend/.env')
 
-# Initialize Anthropic client
-client = anthropic.Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+# Anthropic client / model from env (defaults to a stable "latest" alias)
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL   = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+CLIENT: Optional[anthropic.Anthropic] = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY) if ANTHROPIC_API_KEY else None
 
-conversational_ai_bp = Blueprint('conversational_ai', __name__)
+# File-backed sessions (shared by all Gunicorn workers)
+SESS_DIR = Path(os.getenv("SESSION_DIR", "/home/sekki/sekki-platform/backend/runtime/sessions"))
+SESS_DIR.mkdir(parents=True, exist_ok=True)
 
-# AI System Prompt for Business Analysis
-SYSTEM_PROMPT = """You are an expert business analyst and financial advisor for Sekki, a platform that helps businesses make informed decisions. Your role is to conduct intelligent, conversational analysis of business projects and ideas.
+# History caps (avoid token bloat)
+MAX_HISTORY_CHARS = int(os.getenv("MAX_HISTORY_CHARS", "20000"))
+MAX_TOKENS        = int(os.getenv("ANTHROPIC_MAX_TOKENS", "1024"))
+TEMPERATURE       = float(os.getenv("ANTHROPIC_TEMPERATURE", "0.2"))
 
-OBJECTIVES:
-1. Gather comprehensive information about the user's business project/idea
-2. Understand financial goals, market context, and operational requirements
-3. Identify risks, opportunities, and key success factors
-4. Determine when you have sufficient information for analysis
+SYSTEM_PROMPT = """You are Sekki's market analysis copilot. Be conversational and avoid repeating questions already answered in this session. Build on prior context to advance the analysis for sekki.io."""
 
-CONVERSATION STYLE:
-- Be conversational, professional, and insightful
-- Ask intelligent follow-up questions based on responses
-- Adapt your questioning based on the business model/industry
-- Show expertise by asking about relevant business metrics
-- Be concise but thorough
+conversational_ai_bp = Blueprint("conversational_ai", __name__)
 
-KEY INFORMATION TO GATHER:
-- Business model and value proposition
-- Target market and customer segments
-- Revenue model and financial projections
-- Competitive landscape
-- Operational requirements and resources
-- Timeline and milestones
-- Budget and funding requirements
-- Key risks and assumptions
+def _sid_from_request() -> str:
+    sid = request.headers.get("X-Session-ID") or request.cookies.get("sekki_sid")
+    return sid or f"conv_{uuid.uuid4().hex[:12]}"
 
-ANALYSIS READINESS:
-When you have gathered sufficient information across these areas, inform the user that you're ready to generate their Market IQ analysis. Tell them to type "finish" or "analyze" when they're ready to proceed.
+def _p(sid: str) -> Path:
+    return SESS_DIR / f"{sid}.json"
 
-IMPORTANT: 
-- Never ask more than 2-3 questions at once
-- Build on previous responses naturally
-- Show understanding of their business context
-- Be helpful and insightful, not just interrogative
-"""
+def _load_session(sid: str) -> Dict[str, Any]:
+    fp = _p(sid)
+    if not fp.exists():
+        return {"id": sid, "messages": [], "created_at": int(time.time())}
+    try:
+        return json.loads(fp.read_text(encoding="utf-8"))
+    except Exception as e:
+        current_app.logger.error(f"session_load_error sid={sid}: {e}")
+        return {"id": sid, "messages": [], "created_at": int(time.time())}
 
-# In-memory session storage
-sessions: Dict[str, Dict[str, Any]] = {}
+def _save_session(sess: Dict[str, Any]) -> None:
+    sid = sess["id"]
+    tmp = _p(f"{sid}.{int(time.time()*1000)}.tmp")
+    dst = _p(sid)
+    try:
+        tmp.write_text(json.dumps(sess, ensure_ascii=False), encoding="utf-8")
+        tmp.replace(dst)  # atomic
+    except Exception as e:
+        current_app.logger.error(f"session_save_error sid={sid}: {e}")
 
-class ConversationManager:
-    def __init__(self):
-        pass
-        
-    def create_session(self, description: str) -> Dict[str, Any]:
-        """Create a new conversational analysis session"""
-        session_id = f"conv_{uuid.uuid4().hex[:12]}"
-        
-        session = {
-            "id": session_id,
-            "description": description,
-            "messages": [],
-            "analysis_data": {},
-            "status": "active",
-            "created_at": int(time.time()),
-            "readiness_score": 0,
-            "key_areas_covered": []
-        }
-        
-        sessions[session_id] = session
+def _trim_by_chars(history: List[Dict[str, str]], max_chars: int) -> List[Dict[str, str]]:
+    total = 0
+    out: List[Dict[str, str]] = []
+    for m in reversed(history):
+        c = m.get("content") or ""
+        if total + len(c) > max_chars and out:
+            break
+        out.append(m)
+        total += len(c)
+    return list(reversed(out))
 
-        # Start the conversation
-        initial_response = self._get_ai_response(session, description)
-        
-        return {
-            "session_id": session_id,
-            "message": initial_response,
-            "readiness_score": 0,
-            "status": "gathering_info"
-        }
-    
-    def continue_conversation(self, session_id: str, user_message: str) -> Dict[str, Any]:
-        """Continue an existing conversation"""
-        session = self._load_session(session_id)
-        if not session:
-            return {"error": "Session not found"}
-        
-        # Check if user wants to finish
-        if user_message.lower().strip() in ['finish', 'analyze', 'done', 'ready']:
-            return self._prepare_analysis(session)
-        
-        # Add user message to conversation
-        session["messages"].append({
-            "role": "user",
-            "content": user_message,
-            "timestamp": int(time.time())
-        })
-        
-        # Get AI response
-        ai_response = self._get_ai_response(session, user_message)
-        
-        # Update readiness score
-        readiness_score = self._calculate_readiness(session)
-        
-        # Save session
-        self._save_session(session)
-        
-        return {
-            "message": ai_response,
-            "readiness_score": readiness_score,
-            "status": "ready_for_analysis" if readiness_score >= 80 else "gathering_info",
-            "can_analyze": readiness_score >= 70
-        }
-    
-    def _get_ai_response(self, session: Dict, user_input: str) -> str:
-        """Generate AI response using Anthropic Claude"""
+
+def _anthropic_reply(history: List[Dict[str, str]]) -> str:
+    if not CLIENT:
+        return "(server missing ANTHROPIC_API_KEY)"
+    msgs = [
+        {"role": m.get("role"), "content": m.get("content", "")}
+        for m in history
+        if m.get("role") in ("user", "assistant") and (m.get("content") or "").strip()
+    ]
+    for _ in range(2):
         try:
-            # Build conversation history
-            messages = []
-            
-            # Add conversation history
-            for msg in session["messages"]:
-                messages.append(msg)
-            
-            # Add current user input if it's not the initial description
-            if user_input != session.get("description", ""):
-                messages.append({"role": "user", "content": user_input})
-            else:
-                # Initial conversation starter
-                messages.append({
-                    "role": "user", 
-                    "content": f"I want to analyze this business idea: {user_input}"
-                })
-            
-            # Call Anthropic API
-            response = client.messages.create(
-                model="claude-3-5-sonnet-20240620",
-                system=SYSTEM_PROMPT,
-                messages=messages,
-                max_tokens=1024,
+            resp = CLIENT.messages.create(
+                model=ANTHROPIC_MODEL,
+                system=SYSTEM_PROMPT,  # <-- top-level system, not a message
+                max_tokens=MAX_TOKENS,
+                temperature=TEMPERATURE,
+                messages=msgs,
             )
-            
-            ai_message = response.content[0].text
-            
-            # Add AI response to session
-            session["messages"].append({
-                "role": "assistant",
-                "content": ai_message,
-                "timestamp": int(time.time())
-            })
-            
-            return ai_message
-            
+            parts = []
+            for blk in resp.content:
+                if getattr(blk, "type", None) == "text":
+                    parts.append(blk.text)
+            return ("".join(parts)).strip() or "(no content)"
         except Exception as e:
-            current_app.logger.error(f"Anthropic API error: {e}")
-            return "(removed legacy prompt)"
-    
-    def _calculate_readiness(self, session: Dict) -> int:
-        """Calculate how ready we are for analysis based on conversation content"""
-        conversation_text = " ".join([msg["content"] for msg in session["messages"]])
-        
-        # Key business areas to check for
-        key_areas = {
-            "business_model": ["business model", "revenue", "monetize", "make money", "pricing"],
-            "market": ["market", "customers", "target", "audience", "competition"],
-            "financials": ["budget", "cost", "investment", "funding", "profit", "revenue"],
-            "operations": ["operations", "team", "resources", "timeline", "launch"],
-            "risks": ["risk", "challenge", "concern", "problem", "obstacle"]
-        }
-        
-        covered_areas = 0
-        total_areas = len(key_areas)
-        
-        for area, keywords in key_areas.items():
-            if any(keyword in conversation_text.lower() for keyword in keywords):
-                covered_areas += 1
-                if area not in session["key_areas_covered"]:
-                    session["key_areas_covered"].append(area)
-        
-        # Calculate readiness score (0-100)
-        base_score = (covered_areas / total_areas) * 70
-        
-        # Bonus points for conversation depth
-        message_count = len(session["messages"])
-        depth_bonus = min(message_count * 3, 30)
-        
-        readiness_score = min(int(base_score + depth_bonus), 100)
-        session["readiness_score"] = readiness_score
-        
-        return readiness_score
-    
-    def _prepare_analysis(self, session: Dict) -> Dict[str, Any]:
-        """Prepare the final analysis based on conversation"""
-        # Extract key insights from conversation
-        conversation_summary = self._extract_business_insights(session)
-        
-        # Generate Market IQ score and analysis
-        analysis_result = self._generate_market_analysis(conversation_summary)
-        
-        session["status"] = "completed"
-        session["analysis_result"] = analysis_result
-        self._save_session(session)
-        
-        return {
-            "status": "analysis_complete",
-            "analysis": analysis_result,
-            "session_id": session["id"]
-        }
-    
-    def _extract_business_insights(self, session: Dict) -> Dict[str, Any]:
-        """Extract structured business insights from conversation"""
-        conversation_text = " ".join([
-            msg["content"] for msg in session["messages"] 
-            if msg["role"] == "user"
-        ])
-        
-        # Use AI to extract structured data
-        extraction_prompt = f"""
-        Based on this business conversation, extract key business information:
-        
-        Conversation: {conversation_text}
-        
-        Extract and return JSON with:
-        {{
-            "business_description": "brief description",
-            "target_market": "target customers",
-            "revenue_model": "how they make money",
-            "key_metrics": ["metric1", "metric2"],
-            "main_risks": ["risk1", "risk2"],
-            "competitive_advantages": ["advantage1", "advantage2"],
-            "funding_requirements": "amount or description",
-            "timeline": "launch timeline"
-        }}
-        """
-        
-        try:
-            response = client.messages.create(
-                model="claude-3-5-sonnet-20240620",
-                system="You are a data extraction expert. Extract the requested information in JSON format.",
-                messages=[{"role": "user", "content": extraction_prompt}],
-                max_tokens=2048,
-            )
-            
-            extracted_data = json.loads(response.content[0].text)
-            return extracted_data
-            
-        except Exception as e:
-            current_app.logger.error(f"Data extraction error: {e}")
-            return {"business_description": session.get("description", "")}
-    
-    def _generate_market_analysis(self, insights: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate comprehensive market analysis and scoring"""
-        
-        # This is where you'd implement your sophisticated analysis algorithms
-        # For now, I'll create a structured response that matches your dashboard
-        
-        analysis = {
-            "market_iq_score": self._calculate_market_score(insights),
-            "financial_impact": self._calculate_financial_impact(insights),
-            "component_analysis": self._analyze_components(insights),
-            "key_insights": self._generate_insights(insights),
-            "recommendations": self._generate_recommendations(insights),
-            "risk_assessment": self._assess_risks(insights)
-        }
-        
-        return analysis
-    
-    def _calculate_market_score(self, insights: Dict) -> Dict[str, Any]:
-        """Calculate overall Market IQ score"""
-        # Implement your scoring algorithm here
-        # This is a simplified version
-        base_score = 65
-        
-        # Adjust based on business model clarity
-        if insights.get("revenue_model"):
-            base_score += 10
-        
-        # Adjust based on market definition
-        if insights.get("target_market"):
-            base_score += 10
-        
-        # Adjust based on competitive advantages
-        if insights.get("competitive_advantages"):
-            base_score += 5
-        
-        score = min(base_score, 100)
-        
-        return {
-            "score": score,
-            "rating": "Excellent" if score >= 80 else "Good" if score >= 60 else "Fair"
-        }
-    
-    def _calculate_financial_impact(self, insights: Dict) -> Dict[str, Any]:
-        """Calculate financial impact metrics"""
-        return {
-            "ebitda_at_risk": "$50K",
-            "potential_loss": "$100K", 
-            "roi_opportunity": "$150K",
-            "projected_ebitda": "$300K"
-        }
-    
-    def _analyze_components(self, insights: Dict) -> List[Dict[str, Any]]:
-        """Analyze business components"""
-        return [
-            {"name": "Financial Health", "score": 60, "icon": "dollar-sign"},
-            {"name": "Operational Efficiency", "score": 70, "icon": "chart-line"},
-            {"name": "Market Position", "score": 65, "icon": "bullseye"},
-            {"name": "Execution Readiness", "score": 60, "icon": "users"}
-        ]
-    
-    def _generate_insights(self, insights: Dict) -> List[str]:
-        """Generate key business insights"""
-        return [
-            "Strong market opportunity identified",
-            "Revenue model needs refinement",
-            "Competitive positioning is clear",
-            "Operational scaling plan required"
-        ]
-    
-    def _generate_recommendations(self, insights: Dict) -> List[str]:
-        """Generate actionable recommendations"""
-        return [
-            "Conduct detailed market research",
-            "Develop MVP for customer validation", 
-            "Create detailed financial projections",
-            "Build strategic partnerships"
-        ]
-    
-    def _assess_risks(self, insights: Dict) -> List[Dict[str, Any]]:
-        """Assess business risks"""
-        return [
-            {"risk": "Market adoption uncertainty", "impact": "High", "probability": "Medium"},
-            {"risk": "Competitive response", "impact": "Medium", "probability": "High"},
-            {"risk": "Resource constraints", "impact": "Medium", "probability": "Medium"}
-        ]
-    
-    def _load_session(self, session_id: str) -> Optional[Dict[str, Any]]:
-        """Load session from in-memory storage"""
-        return sessions.get(session_id)
-    
-    def _save_session(self, session: Dict[str, Any]) -> None:
-        """Save session to in-memory storage"""
-        sessions[session['id']] = session
+            current_app.logger.warning(f"anthropic_call_failed: {e}")
+    return "(anthropic error)"
 
-# Flask routes
-@conversational_ai_bp.route("/_legacy_conversation/start", methods=["POST"])
-def start_conversation():
-    """Start a new conversational analysis"""
-    try:
-        data = request.get_json() or {}
-        description = data.get("description", "").strip()
-        
-        if not description:
-            return jsonify({"error": "Description is required"}), 400
-        
-        # Initialize conversation manager
-        manager = ConversationManager()
-        
-        result = manager.create_session(description)
-        return jsonify(result), 200
-        
-    except Exception as e:
-        current_app.logger.exception("conversation_start_failed")
-        return jsonify({"error": "conversation_start_failed", "details": str(e)}), 500
-
-@conversational_ai_bp.route("/_legacy_conversation/continue", methods=["POST"])
-def continue_conversation():
-    """Continue an existing conversation"""
-    try:
-        data = request.get_json() or {}
-        session_id = data.get("session_id", "").strip()
-        message = data.get("message", "").strip()
-        
-        if not session_id or not message:
-            return jsonify({"error": "Session ID and message are required"}), 400
-        
-        # Initialize conversation manager
-        manager = ConversationManager()
-        
-        result = manager.continue_conversation(session_id, message)
-        return jsonify(result), 200
-        
-    except Exception as e:
-        current_app.logger.exception("conversation_continue_failed")
-        return jsonify({"error": "conversation_continue_failed", "details": str(e)}), 500
-
-# === Compatibility wrappers for existing frontend endpoints ===
-# These map the old Market IQ intake + chat endpoints to the Anthropic conversation engine.
-
-# Ensure a single global manager for sessions
-_manager = ConversationManager()
-
-@conversational_ai_bp.route("/market-iq/intake/start", methods=["POST"])
-def miq_intake_start():
-    try:
-        data = request.get_json(force=True, silent=True) or {}
-        description = (data.get("description") or "").strip()
-        if not description:
-            return jsonify({"error": "description is required"}), 400
-
-        out = _manager.create_session(description)
-        # Frontend contract:
-        # analysis_id, question, field, answered, total_questions, complete, analysis_result
-        return jsonify({
-            "analysis_id": out["session_id"],
-            "question": out["message"] or "Tell me your target customer, budget, and timeline to begin.",
-            "field": "primary_goal",
-            "answered": 0,
-            "total_questions": 16,
-            "complete": False,
-            "analysis_result": None
-        })
-    except Exception as e:
-        current_app.logger.exception("miq_intake_start failed")
-        return jsonify({"error": str(e)}), 500
-
-@conversational_ai_bp.route("/market-iq/intake/answer", methods=["POST"])
-def miq_intake_answer():
-    try:
-        data = request.get_json(force=True, silent=True) or {}
-        analysis_id = data.get("analysis_id")
-        answer = (data.get("answer") or "").strip()
-        if not analysis_id or not answer:
-            return jsonify({"error": "analysis_id and answer are required"}), 400
-
-        out = _manager.continue_conversation(analysis_id, answer)
-
-        # If session prepared an analysis, return complete
-        complete = bool(out.get("status") in ("ready", "complete", "analysis_ready")) or bool(out.get("analysis_result"))
-        analysis_result = out.get("analysis_result") or out.get("analysis") or None
-
-        # Next question is the AI message when still gathering info
-        next_q = None if complete else (out.get("message") or "I need a bit more detail—budget, timeline, and target customer?")
-
-        return jsonify({
-            "complete": complete,
-            "next_field": None if complete else "unspecified",
-            "next_question": next_q,
-            "analysis_result": analysis_result,
-            "answered": out.get("readiness_score", 0),   # approximate progress
-            "total_questions": 16
-        })
-    except Exception as e:
-        current_app.logger.exception("miq_intake_answer failed")
-        return jsonify({"error": str(e)}), 500
+@conversational_ai_bp.route("/health", methods=["GET"])
+def health() -> Any:
+    return jsonify({"ok": True, "model": ANTHROPIC_MODEL, "client": bool(CLIENT)}), 200
 
 @conversational_ai_bp.route("/chat", methods=["POST"])
-def miq_chat():
-    """
-    Compatible with frontend MarketIQ.chat():
-      { message, docType, detailed, phase, systemPrompt, analysis_context, analysis_id }
-    """
-    try:
-        payload = request.get_json(force=True, silent=True) or {}
-        message = (payload.get("message") or "").strip()
-        if not message:
-            return jsonify({"response": "Please provide a message."})
+def chat() -> Any:
+    data = request.get_json(silent=True) or {}
+    user_text = (data.get("message") or "").strip()
+    if not user_text:
+        return jsonify({"error": "message is required"}), 400
 
-        system = payload.get("systemPrompt") or "You are a market analyst assisting with deep-dive Q&A on a completed Market IQ analysis."
-        context = payload.get("analysis_context") or {}
+    sid = _sid_from_request()
+    sess = _load_session(sid)
 
-        # Build Anthropic call
-        aclient = client  # from module scope
-        resp = aclient.messages.create(
-            model=os.getenv("ANTHROPIC_MODEL", "claude-3-5-sonnet-latest"),
-            max_tokens=800,
-            temperature=0.2,
-            system=system,
-            messages=[{"role": "user", "content": json.dumps({"context": context, "message": message})}],
+    # Append user turn
+    sess.setdefault("messages", []).append({"role": "user", "content": user_text, "ts": int(time.time())})
+
+    # Trim and get reply
+    history = _trim_by_chars(sess["messages"], MAX_HISTORY_CHARS)
+    reply = _anthropic_reply(history)
+
+    # Append assistant turn and persist
+    sess["messages"].append({"role": "assistant", "content": reply, "ts": int(time.time())})
+    _save_session(sess)
+
+    # Response (sets cookie if needed)
+    resp = make_response(jsonify({"session_id": sid, "reply": reply}))
+    if not request.cookies.get("sekki_sid"):
+        # Cookie must be accessible by frontend JS for fetch; httponly False by design.
+        resp.set_cookie(
+            "sekki_sid",
+            value=sid,
+            max_age=30 * 24 * 3600,
+            secure=True,
+            httponly=False,
+            samesite="None",
         )
-
-        text_parts = []
-        for c in resp.content:
-            if getattr(c, "type", "") == "text":
-                text_parts.append(c.text)
-        text = "\n".join(text_parts).strip() or "OK."
-
-        return jsonify({"response": text})
-    except Exception as e:
-        current_app.logger.exception("miq_chat failed")
-        return jsonify({"response": f"Error: {e}"}), 500
-
-# ---- Compatibility aliases for builds calling /api/market-iq/conversation/* ----
-# These forward to the already-implemented Claude conversation handlers.
-
-@conversational_ai_bp.route("/market-iq/_legacy_conversation/start", methods=["POST"])
-def miq_conv_start_alias():
-    payload = (request.get_json(silent=True) or {})
-    desc = (payload.get('description') or "").strip()
-    if not desc:
-        return jsonify({"error":"description required"}), 400
-    mgr = ConversationManager()
-    out = mgr.create_session(desc)
-    return jsonify(out)
-    return miq_intake_start()
-
-@conversational_ai_bp.route("/market-iq/_legacy_conversation/continue", methods=["POST"])
-def miq_conv_continue_alias():
-    data = (request.get_json(silent=True) or {})
-    sess = data.get('session_id') or data.get('analysis_id')
-    msg  = data.get('message')    or data.get('answer')
-    if not sess or not msg:
-        return jsonify({"error":"session_id and message required"}), 400
-    mgr = ConversationManager()
-    out = mgr.continue_conversation(sess, msg)
-    return (jsonify(out), 200) if "error" not in out else (jsonify(out), 400)
-    return miq_intake_answer()
-
-# === File-backed session persistence (works across Gunicorn workers) ===
-import os as _os, json as _json
-
-_SESS_DIR = _os.environ.get("CONVO_SESS_DIR",
-    "/home/sekki/sekki-platform/backend/runtime/sessions")
-
-# ensure dir exists
-try:
-    _os.makedirs(_SESS_DIR, exist_ok=True)
-except Exception:
-    pass
-
-def _sess_path(_sid): return _os.path.join(_SESS_DIR, f"{_sid}.json")
-
-def _fs_load(_sid):
-    try:
-        with open(_sess_path(_sid), "r") as f:
-            return _json.load(f)
-    except Exception:
-        return None
-
-def _fs_save(_session):
-    try:
-        with open(_sess_path(_session["id"]), "w") as f:
-            _json.dump(_session, f)
-    except Exception:
-        current_app.logger.exception("Failed writing session file")
-
-# --- Monkey-patch ConversationManager to use shared storage ---
-try:
-    _orig_create = ConversationManager.create_session
-
-    def _cm_load(self, session_id: str):
-        # try memory first, then disk; mirror into memory for speed
-        s = sessions.get(session_id)
-        if s:
-            return s
-        s = _fs_load(session_id)
-        if s:
-            sessions[session_id] = s
-        return s
-
-    def _cm_save(self, session: dict):
-        sessions[session["id"]] = session
-        _fs_save(session)
-
-    def _cm_create(self, description: str):
-        out = _orig_create(self, description)
-        # persist immediately so next request on another worker finds it
-        sid = out.get("session_id")
-        if sid and sid in sessions:
-            _fs_save(sessions[sid])
-        return out
-
-    ConversationManager._load_session = _cm_load
-    ConversationManager._save_session = _cm_save
-    ConversationManager.create_session = _cm_create
-    print("DEBUG: File-backed session store active ->", _SESS_DIR)
-except Exception as _e:
-    print(f"DEBUG: File-backed session store NOT active: {_e}")
+    return resp

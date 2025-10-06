@@ -47,7 +47,7 @@ def create_app():
     # —— Stripe setup —— #
     stripe_key = app.config['STRIPE_SECRET_KEY']
     if not stripe_key:
-        raise RuntimeError("STRIPE_SECRET_KEY not set in environment")
+        current_app.logger.warning("STRIPE_SECRET_KEY not set; Stripe features disabled."); app.config["STRIPE_SECRET_KEY"] = None
     stripe.api_key = stripe_key
 
     # —— Map plan_keys to Stripe Price IDs —— #
